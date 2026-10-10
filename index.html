@@ -477,6 +477,25 @@ td.amt.neg{color:var(--pos)}
 .bunset{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:14px;margin-top:8px;border-radius:14px;border:1.5px dashed var(--line-strong)}
 .ico.dashed{width:40px;height:40px;border-radius:12px;border:2px dashed var(--ink-3);color:var(--ink-2);box-sizing:border-box}
 
+/* provisórios, + gasto e atalho */
+.shift.prov{color:var(--warn);border-color:var(--warn)}
+.addbtn{background:var(--ink);color:var(--ground)}
+.dlg{border:0;border-radius:20px;padding:22px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow:auto;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.dlg::backdrop{background:rgba(10,18,16,.45)}
+.dhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.dhead h2{font-size:21px}
+.gfield{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.gfield input[type=text],.gfield input[type=date]{width:100%;min-height:44px}
+.gfield .moneybox input{width:100%;font-size:22px;padding:10px}
+.gcats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.gcat{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:6px 10px 6px 6px;font-size:13px;text-align:left;min-height:44px}
+.gcat .ico{width:32px;height:32px;border-radius:9px}
+.gcat[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink);background:var(--surface-2)}
+.asteps{padding-left:20px;margin:0 0 16px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.afield{margin-bottom:12px}
+.arow{display:flex;gap:8px;align-items:center;margin-top:4px}
+.arow code{flex:1;min-width:0;font:12px var(--f-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;overflow-wrap:anywhere}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -531,6 +550,7 @@ td.amt.neg{color:var(--pos)}
     </div>
     <div class="controls">
       <div class="months" id="months"></div>
+      <button class="btn tiny addbtn" id="addGasto">+ gasto</button>
       <button class="btn ghost tiny" id="toggleImport">+ importar arquivos</button>
     </div>
 
@@ -696,6 +716,23 @@ td.amt.neg{color:var(--pos)}
     </div>
   </div>
 </div>
+<dialog class="dlg" id="gastoDlg" aria-labelledby="gTitle">
+  <form method="dialog" id="gForm">
+    <div class="dhead"><h2 id="gTitle">Novo gasto</h2><button type="button" class="fixdel" id="gClose" aria-label="Fechar">×</button></div>
+    <label class="gfield"><span class="eyebrow">valor</span>
+      <span class="moneybox"><span class="cur">R$</span><input id="gValor" inputmode="decimal" autocomplete="off" placeholder="0,00"></span></label>
+    <label class="gfield"><span class="eyebrow">o que foi (opcional)</span><input type="text" id="gDesc" placeholder="ex.: iFood, mercado, presente da mãe"></label>
+    <div class="gfield"><span class="eyebrow">categoria (opcional — sem escolher, o app tenta adivinhar)</span><div class="gcats" id="gCats"></div></div>
+    <label class="gfield"><span class="eyebrow">data</span><input type="date" id="gData"></label>
+    <p class="fnote">Entra como <b>provisório</b>: conta no orçamento agora e é trocado pelo lançamento da fatura quando você importar.</p>
+    <div class="row" style="justify-content:flex-end"><span class="fnote" id="gMsg" style="color:var(--crit)"></span><button class="btn" type="submit">Salvar</button></div>
+  </form>
+</dialog>
+<dialog class="dlg" id="atalhoDlg" aria-labelledby="aTitle">
+  <div class="dhead"><h2 id="aTitle">Atalho do iPhone</h2><button type="button" class="fixdel" id="aClose" aria-label="Fechar">×</button></div>
+  <p class="fnote" style="margin-top:0">Toda compra com Apple Pay vira um gasto aqui na hora, sem você fazer nada. Precisa de iOS 17 ou mais novo.</p>
+  <div id="aBody"></div>
+</dialog>
 <div class="tt" id="tt"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1382,7 +1419,7 @@ function migrateCategories(){
   // destino de um Pix já reconhecido como "para você mesmo" é sempre você
   const self = new Set(TX.filter(t=>t.cat==='Transferência' && t.sub==='Entre contas próprias').map(t=>t.merchant));
   for(const t of TX){
-    if(t.cat==='Transferência') continue;
+    if(t.cat==='Transferência' || t.source==='manual') continue;
     if(t.amount > 0 && self.has(t.merchant)){ t.cat='Transferência'; t.sub='Entre contas próprias'; continue; }
     const [c,s] = autoCategory((t.raw||'')+' '+(t.detail||''), t.amount<0, t.source);
     t.cat = c; t.sub = s;
@@ -1471,9 +1508,11 @@ async function handleFiles(list){
     }
   }
   TX.sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
+  const conc = reconcileProvisional();
   save();
+  const concTxt = conc ? ' · '+conc+' provisório'+(conc>1?'s':'')+' trocado'+(conc>1?'s':'')+' pelo oficial' : '';
   if(errs.length) setStatus(errs.join(' · '), 'err');
-  else if(added) setStatus(added+' lançamento'+(added>1?'s':'')+' novo'+(added>1?'s':'')+' importado'+(added>1?'s':''), 'ok');
+  else if(added) setStatus(added+' lançamento'+(added>1?'s':'')+' novo'+(added>1?'s':'')+' importado'+(added>1?'s':'')+concTxt, 'ok');
   else setStatus('Nada novo: cada linha destes arquivos já estava aqui.', 'ok');
   renderFiles(report); render();
 }
@@ -2501,6 +2540,15 @@ function renderAlerts(list){
     btn.onclick = ()=>{ catFilter=UNSET; $('#catFilter').value=catFilter; renderTable(txOfMonth(curMonth)); document.querySelector('#rows').scrollIntoView({behavior:'smooth',block:'center'}); };
     a.appendChild(btn); box.appendChild(a);
   }
+  const stale = staleProvisional();
+  if(stale.length){
+    const a = el('div','alert warn');
+    const tot = stale.reduce((s,t)=>s+t.amount,0);
+    a.innerHTML = `<span><b>${stale.length}</b> gasto${stale.length>1?'s':''} provisório${stale.length>1?'s':''} com mais de 45 dias sem par na fatura — ${brl(tot)}. Pode ser compra parcelada ou cancelada.</span>`;
+    const btn = el('button','btn ghost tiny aact','apagar');
+    btn.onclick = ()=>{ const ids = new Set(stale.map(t=>t.id)); TX = TX.filter(t=>!ids.has(t.id)); save(); render(); };
+    a.appendChild(btn); box.appendChild(a);
+  }
   const dupes = findDupes(list);
   if(dupes.length){
     const a = el('div','alert info');
@@ -2565,6 +2613,12 @@ function renderTable(list){
     ds.appendChild(m);
     ds.appendChild(el('span','raw', t.raw + (t.parcela && t.parcela!=='Única' ? ' · '+t.parcela : '')));
     if(isShifted(t)) m.appendChild(el('span','shift','conta de '+monthLabel(mOf(t))));
+    if(t.prov){
+      m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : 'provisório'));
+      const del = el('button','fixdel','×'); del.title = 'apagar este provisório'; del.setAttribute('aria-label','Apagar provisório');
+      del.onclick = ev => { ev.stopPropagation(); TX = TX.filter(x=>x!==t); delete OVERRIDE[t.id]; save(); render(); };
+      m.appendChild(del);
+    }
     const ct = document.createElement('td');
     const chip = el('button','chip'+(e.cat===UNSET?' unset':''));
     chip.appendChild(el('span','dot'));
@@ -2807,6 +2861,7 @@ function mergeBackup(b){
   if(b.avg && !avgMonths){ avgMonths = new Set(b.avg); LS.set(K.avg, b.avg); }
   LS.set(K.fixed, FIXED);
   TX.sort((a,b2)=> a.date<b2.date?1:a.date>b2.date?-1:0);
+  reconcileProvisional();
   save();
   return n;
 }
@@ -2874,6 +2929,10 @@ document.querySelectorAll('th[data-sort]').forEach(th=>{
 });
 window.addEventListener('keydown', e=>{ if(e.key==='Escape') closePop(); });
 
+$('#addGasto').onclick = openGasto;
+$('#gForm').onsubmit = saveGasto;
+$('#gClose').onclick = ()=> $('#gastoDlg').close();
+$('#aClose').onclick = ()=> $('#atalhoDlg').close();
 $('#bReset').onclick = ()=>{ if(BUDGET){ BUDGET.limits = {}; saveBudget(); } renderBudget(); };
 
 /* painéis recolhíveis — o estado fica salvo */
@@ -2898,6 +2957,160 @@ $('#bReset').onclick = ()=>{ if(BUDGET){ BUDGET.limits = {}; saveBudget(); } ren
     h2.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); flip(); } };
   });
 })();
+
+/* ============================ gastos provisórios ============================
+   Vêm do atalho do iPhone (Apple Pay) ou do "+ gasto". Contam no mês na hora;
+   quando a fatura ou o extrato trazem o mesmo gasto, o oficial fica e o provisório
+   sai — levando junto a categoria que você tiver escolhido para ele. */
+const dayNum = d => new Date(d+'T12:00:00').getTime()/864e5;
+const wordsOf = s => new Set(norm(s).split(/[^A-Z0-9]+/).filter(w=>w.length>=3));
+function reconcileProvisional(){
+  const prov = TX.filter(t=>t.prov);
+  if(!prov.length) return 0;
+  const offi = TX.filter(t=>!t.prov && t.amount>0);
+  const used = new Set(), gone = new Set();
+  for(const p of prov){
+    let best = null, bestScore = -Infinity;
+    const wp = wordsOf(p.raw+' '+p.merchant);
+    for(const o of offi){
+      if(used.has(o.id) || Math.abs(o.amount-p.amount) > 0.01) continue;
+      const dd = Math.abs(dayNum(o.date)-dayNum(p.date));
+      if(dd > 4) continue;
+      // mesmo valor e data perto já basta; nome parecido desempata
+      let common = 0; wordsOf(o.raw+' '+o.merchant).forEach(w=>{ if(wp.has(w)) common++; });
+      const score = common*10 - dd;
+      if(score > bestScore){ best = o; bestScore = score; }
+    }
+    if(!best) continue;
+    used.add(best.id); gone.add(p.id);
+    if(OVERRIDE[p.id]){ if(!OVERRIDE[best.id]) OVERRIDE[best.id] = OVERRIDE[p.id]; delete OVERRIDE[p.id]; }
+    else if(p.source==='manual' && !RULES_USER[best.merchant] && !OVERRIDE[best.id]) OVERRIDE[best.id] = {cat:p.cat, sub:p.sub};
+  }
+  if(gone.size) TX = TX.filter(t=>!gone.has(t.id));
+  return gone.size;
+}
+// provisório velho sem par: provavelmente parcelado ou cancelado — vira aviso
+const staleProvisional = () => TX.filter(t=>t.prov && dayNum(iso(new Date())) - dayNum(t.date) > 45);
+
+function addProvisional(t){
+  TX.push(t);
+  TX.sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0);
+  reconcileProvisional();
+  save();
+}
+
+/* ---- "+ gasto": lançar na hora, à mão ---- */
+let gastoCat = null;
+function openGasto(){
+  const dlg = $('#gastoDlg');
+  gastoCat = null;
+  $('#gValor').value = ''; $('#gDesc').value = ''; $('#gData').value = iso(new Date());
+  $('#gMsg').textContent = '';
+  const grid = $('#gCats'); grid.innerHTML = '';
+  Object.keys(CATS).filter(c=>!EXPENSE_EXCLUDE.includes(c) && c!==UNSET).forEach(c=>{
+    const m = catMeta(c);
+    const b = el('button','gcat'); b.type = 'button';
+    b.setAttribute('aria-pressed','false');
+    b.append(icoEl(m.i, m.c, 20), el('span', null, c));
+    b.onclick = ()=>{ gastoCat = gastoCat===c ? null : c; grid.querySelectorAll('.gcat').forEach(x=>x.setAttribute('aria-pressed', String(x===b && gastoCat===c))); };
+    grid.appendChild(b);
+  });
+  dlg.showModal();
+  setTimeout(()=>$('#gValor').focus(), 50);
+}
+function saveGasto(e){
+  e.preventDefault();
+  // "23,90" ou "23.90": sem vírgula, o ponto é decimal
+  const raw = $('#gValor').value.trim();
+  const v = raw.includes(',') ? parseBRL(raw) : parseFloat(raw.replace(/[^\d.]/g,''));
+  if(!(v > 0)){ $('#gMsg').textContent = 'Coloque o valor.'; return; }
+  const desc = $('#gDesc').value.trim();
+  const date = $('#gData').value || iso(new Date());
+  let cat = gastoCat, sub = '';
+  const [ac, as] = desc ? autoCategory(desc, false, 'manual') : [null, ''];
+  if(cat) sub = ac===cat ? as : ((CATS[cat]||[])[0] || '');
+  else if(desc){ cat = ac; sub = as; }
+  else { cat = UNSET; }
+  addProvisional({ id:'m'+Date.now().toString(36), date, month:date.slice(0,7), raw: desc || cat, detail:'',
+    merchant: desc ? merchantOf(desc) : cat, amount: Math.round(v*100)/100, source:'manual', method:'Crédito',
+    parcela:'', card:'', cat, sub, auto:false, prov:true, mv:MERCHANT_V });
+  $('#gastoDlg').close();
+  render();
+}
+
+/* ---- atalho do iPhone: caixa de entrada no Supabase ---- */
+async function pullInbox(){
+  if(!supa || !cloudUser || DEMO_SAFE()) return;
+  const { data, error } = await supa.from('entrada').select('id, valor, loja, cartao, quando').order('id');
+  if(error){ console.error(error); return; }
+  if(!data || !data.length) return;
+  const have = new Set(TX.map(t=>t.id));
+  let n = 0;
+  for(const r of data){
+    const id = 'ap'+r.id;
+    if(have.has(id)) continue;
+    const t = mkTx({ id, date: iso(new Date(r.quando)), raw: r.loja || 'Apple Pay', amount: Number(r.valor),
+      source:'applepay', method:'Crédito', isIncome:false, card: r.cartao || '' });
+    t.prov = true; t.mv = MERCHANT_V;
+    TX.push(t); n++;
+  }
+  if(n){ TX.sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:0); reconcileProvisional(); save(); render(); }
+  // só sai da caixa de entrada depois de guardado aqui — e sobe no próximo envio
+  const { error: delErr } = await supa.from('entrada').delete().in('id', data.map(r=>r.id));
+  if(delErr) console.error(delErr);
+}
+
+async function openAtalho(){
+  const dlg = $('#atalhoDlg');
+  const box = $('#aBody'); box.innerHTML = '';
+  dlg.showModal();
+  if(!supa || !cloudUser){ box.appendChild(el('p', null, 'Entre com seu e-mail lá em cima primeiro — o atalho manda os gastos para a sua conta.')); return; }
+  box.appendChild(el('p','fnote','Gerando seu código…'));
+  let { data, error } = await supa.from('atalho_tokens').select('token').limit(1).maybeSingle();
+  if(!error && !data){ ({ data, error } = await supa.from('atalho_tokens').insert({}).select('token').single()); }
+  box.innerHTML = '';
+  if(error || !data){
+    box.appendChild(el('p','fnote','Não consegui criar o código. Rodou o arquivo supabase-atalho.sql no Supabase? ('+(error ? error.message : 'sem resposta')+')'));
+    return;
+  }
+  const url = SUPA_URL + '/rest/v1/rpc/registrar_gasto';
+  const field = (label, value) => {
+    const w = el('div','afield');
+    w.appendChild(el('div','eyebrow', label));
+    const row = el('div','arow');
+    const code = el('code', null, value);
+    const b = el('button','btn ghost tiny','copiar'); b.type = 'button';
+    b.onclick = async ()=>{ try{ await navigator.clipboard.writeText(value); b.textContent = 'copiado'; setTimeout(()=>b.textContent='copiar', 1500); }catch(e){ b.textContent = 'segure o texto para copiar'; } };
+    row.append(code, b); w.appendChild(row);
+    return w;
+  };
+  const steps = el('ol','asteps');
+  [
+    'No app <b>Atalhos</b>, vá em <b>Automação</b> › <b>+</b> › <b>Transação</b>.',
+    'Escolha seus cartões da Carteira, marque <b>Executar Imediatamente</b> e toque em <b>Seguinte</b> › <b>Nova Automação em Branco</b>.',
+    'Adicione a ação <b>Obter Conteúdo do URL</b> e cole o <b>endereço</b> abaixo no lugar do URL.',
+    'Toque na setinha da ação: <b>Método</b> = <b>POST</b>.',
+    'Em <b>Cabeçalhos</b>, adicione dois: <b>apikey</b> com a <b>chave</b> abaixo, e <b>Authorization</b> com <b>Bearer </b> + a mesma chave (com um espaço depois de Bearer).',
+    'Em <b>Corpo da Solicitação</b> deixe <b>JSON</b> e adicione quatro campos de texto: <b>token</b> = o <b>seu código</b>; <b>valor</b> = a variável <b>Quantia</b> da Transação; <b>loja</b> = <b>Comerciante</b>; <b>cartao</b> = <b>Cartão ou Passe</b>.',
+    'Pronto. Na próxima compra com o iPhone, abra o app: o gasto aparece como <b>provisório</b> e some sozinho quando a fatura for importada.'
+  ].forEach(h=>{ const li = document.createElement('li'); li.innerHTML = h; steps.appendChild(li); });
+  box.append(steps, field('endereço', url), field('chave (pública)', SUPA_KEY), field('seu código (secreto — não compartilhe)', data.token));
+  const test = el('button','btn tiny','mandar um gasto de teste de R$ 1,00'); test.type = 'button';
+  const tmsg = el('span','fnote');
+  test.onclick = async ()=>{
+    test.disabled = true;
+    try{
+      const r = await fetch(url, { method:'POST', headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY, 'Content-Type':'application/json' },
+        body: JSON.stringify({ token:data.token, valor:'R$ 1,00', loja:'Teste do atalho', cartao:'teste' }) });
+      if(!r.ok) throw new Error(await r.text());
+      await pullInbox();
+      tmsg.textContent = 'Chegou! Ele está nos lançamentos como provisório — pode apagar.';
+    }catch(e){ tmsg.textContent = 'Não chegou: '+e.message; }
+    test.disabled = false;
+  };
+  const tr = el('div','row'); tr.style.justifyContent = 'flex-start'; tr.append(test, tmsg);
+  box.appendChild(tr);
+}
 
 /* ============================ nuvem (Supabase) ============================
    Com SUPA_URL e SUPA_KEY preenchidos, quem entra com o e-mail guarda tudo numa
@@ -3029,7 +3242,10 @@ function renderSync(){
   const out = el('button','syncout','sair');
   out.type = 'button';
   out.onclick = async ()=>{ await supa.auth.signOut(); };
-  box.append(pill, out);
+  const at = el('button','syncout','atalho do iPhone');
+  at.type = 'button';
+  at.onclick = openAtalho;
+  box.append(pill, at, out);
 }
 
 function loadScript(src){ return new Promise((ok, err)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=err; document.head.appendChild(s); }); }
@@ -3042,13 +3258,13 @@ async function cloudInit(){
     const u = session ? session.user : null;
     const changed = (u && u.id) !== (cloudUser && cloudUser.id);
     cloudUser = u;
-    if(u && changed){ setTimeout(cloudPull, 0); }
+    if(u && changed){ setTimeout(async ()=>{ await cloudPull(); pullInbox(); }, 0); }
     if(!u) setCloud('off');
     else renderSync();
   });
   renderSync();
   // voltou para a aba: pode ter mudado no outro aparelho
-  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && cloudUser && !isCloudDirty()) cloudPull(); });
+  document.addEventListener('visibilitychange', async ()=>{ if(document.visibilityState!=='visible' || !cloudUser) return; if(!isCloudDirty()) await cloudPull(); pullInbox(); });
 }
 
 renderFiles();
