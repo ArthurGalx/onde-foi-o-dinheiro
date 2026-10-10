@@ -463,6 +463,7 @@ body.has-data .top .sub{display:none}
   .logo{width:36px;height:36px;border-radius:11px}
   .wrap{padding-top:16px}
   body.has-data .acct{display:none}
+  .bhero .bright{display:none}
 }
 
 /* orçamento */
@@ -1367,7 +1368,9 @@ function mOf(t){
   return t.month;
 }
 function isShifted(t){ return mOf(t) !== t.month; }
-let curMonth = null, sortBy='date', sortDir=-1, search='', catFilter='';
+// mês e página escolhidos ficam neste aparelho: o iPhone recarrega a aba quando ela fica parada
+const VIEW = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+let curMonth = VIEW.get('c6.month'), sortBy='date', sortDir=-1, search='', catFilter='';
 let DEMO = false;
 const savedAvg = LS.get(K.avg, null);
 let avgMonths = savedAvg ? new Set(savedAvg) : null;   // null = ainda não escolhido
@@ -1750,6 +1753,7 @@ function render(){
   all.onclick=()=>{ curMonth='ALL'; render(); };
   mbox.appendChild(all);
 
+  if(!DEMO) VIEW.set('c6.month', curMonth);
   const list = txOfMonth(curMonth);
   const t = totals(list);
   const prevM = curMonth==='ALL' ? null : ms[ms.indexOf(curMonth)+1];
@@ -3005,6 +3009,7 @@ function goPage(p, fromHash){
   // orçamento é sempre de um mês: em "tudo", volta para o mês padrão
   if(p==='orcamento' && curMonth==='ALL'){ curMonth = null; render(); }
   document.querySelectorAll('.tab').forEach(a=>{ if(a.dataset.tab===p) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  VIEW.set('c6.page', p);
   if(!fromHash && location.hash !== '#'+p) history.pushState(null, '', '#'+p);
   window.scrollTo(0, 0);
 }
@@ -3013,7 +3018,7 @@ window.addEventListener('popstate', ()=>{ const h = location.hash.slice(1); goPa
 document.querySelectorAll('.tab').forEach(a=> a.onclick = e => { e.preventDefault(); goPage(a.dataset.tab); });
 $('#moreAtalho').onclick = ()=> openAtalho();
 $('#moreDemo').onclick = ()=> $('#demoBtn').click();
-goPage(PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inicio', true);
+goPage(PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : (VIEW.get('c6.page') || 'inicio'), true);
 
 /* painéis recolhíveis — o estado fica salvo */
 (function(){
@@ -3225,7 +3230,6 @@ function applyState(s){
   CATS = LS.get(K.cats, DEFAULT_CATS); FILES = LS.get(K.files, []); DISMISSED = LS.get(K.dismiss, []);
   FIXED = LS.get(K.fixed, null); BUDGET = LS.get(K.budget, null);
   const av = LS.get(K.avg, null); avgMonths = av ? new Set(av) : null;
-  curMonth = null;
   renderFiles(); render();
 }
 function markSynced(at){
