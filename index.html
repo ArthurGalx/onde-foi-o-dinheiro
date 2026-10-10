@@ -515,6 +515,9 @@ body.has-data .top .sub{display:none}
 
 /* provisórios, + gasto e atalho */
 .shift.prov{color:var(--warn);border-color:var(--warn)}
+.fixdel.armed{color:var(--crit);background:var(--crit-soft);font-size:12px;font-weight:600}
+td.desc .fixdel{opacity:.45;margin-left:4px;padding:2px 6px}
+tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opacity:1}
 .addbtn{background:var(--ink);color:var(--ground)}
 .dlg{border:0;border-radius:20px;padding:22px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow:auto;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 .dlg::backdrop{background:rgba(10,18,16,.45)}
@@ -2785,12 +2788,23 @@ function renderTable(list){
     ds.appendChild(m);
     ds.appendChild(el('span','raw', t.raw + (t.parcela && t.parcela!=='Única' ? ' · '+t.parcela : '')));
     if(isShifted(t)) m.appendChild(el('span','shift','conta de '+monthLabel(mOf(t))));
-    if(t.prov){
-      m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : t.source==='print' ? 'fatura aberta · provisório' : 'provisório'));
-      const del = el('button','fixdel','×'); del.title = 'apagar este provisório'; del.setAttribute('aria-label','Apagar provisório');
-      del.onclick = ev => { ev.stopPropagation(); forgetTx([t.id]); delete OVERRIDE[t.id]; save(); render(); };
-      m.appendChild(del);
-    }
+    if(t.prov) m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : t.source==='print' ? 'fatura aberta · provisório' : 'provisório'));
+    // provisório sai com um toque; lançamento de arquivo pede confirmação — e não volta ao reimportar
+    const del = el('button','fixdel','×');
+    del.title = t.prov ? 'apagar este provisório' : 'apagar este lançamento (ex.: duplicado)';
+    del.setAttribute('aria-label', 'Apagar '+pretty(t.merchant)+' de '+brl(t.amount));
+    let armed = false, timer = null;
+    del.onclick = ev => {
+      ev.stopPropagation();
+      if(!t.prov && !armed){
+        armed = true; del.textContent = 'apagar?'; del.classList.add('armed');
+        timer = setTimeout(()=>{ armed = false; del.textContent = '×'; del.classList.remove('armed'); }, 4000);
+        return;
+      }
+      clearTimeout(timer);
+      forgetTx([t.id]); delete OVERRIDE[t.id]; save(); render();
+    };
+    m.appendChild(del);
     const ct = document.createElement('td');
     const chip = el('button','chip'+(e.cat===UNSET?' unset':''));
     chip.appendChild(el('span','dot'));
