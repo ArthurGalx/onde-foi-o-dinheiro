@@ -1047,7 +1047,7 @@ const LS = {
   set(k, v){ try{ const s = JSON.stringify(v); if(localStorage.getItem(k) === s) return; localStorage.setItem(k, s); }catch(e){} cloudDirty(k); },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} cloudDirty(k); }
 };
-const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2', budget:'c6.budget.v1' };
+const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2', budget:'c6.budget.v1', deleted:'c6.deleted.v1' };
 
 const deaccent = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const norm = s => deaccent(String(s||'')).toUpperCase().replace(/\s+/g,' ').trim();
@@ -1330,6 +1330,10 @@ let OVERRIDE = LS.get(K.over, {});        // txId -> {cat, sub}
 let CATS = LS.get(K.cats, DEFAULT_CATS);
 let FILES = LS.get(K.files, []);
 let DISMISSED = LS.get(K.dismiss, []);
+// lançamentos que você apagou: a sincronização junta os dois lados, e sem esta lista
+// a cópia do outro aparelho traria de volta o que foi apagado
+let DELETED = new Set(LS.get(K.deleted, []));
+function forgetTx(ids){ ids.forEach(id=>DELETED.add(id)); TX = TX.filter(t=>!DELETED.has(t.id)); }
 let FIXED = LS.get(K.fixed, null);        // merchant -> {cutoff}: contas fixas mensais
 let BUDGET = LS.get(K.budget, null);      // {limits:{categoria:valor}, meta}: orçamento do mês
 
@@ -1513,7 +1517,7 @@ function migrateCategories(){
   save();
 }
 
-function save(){ if(DEMO) return; LS.set(K.tx,TX); LS.set(K.rules,RULES_USER); LS.set(K.over,OVERRIDE); LS.set(K.cats,CATS); LS.set(K.files,FILES); LS.set(K.dismiss,DISMISSED); }
+function save(){ if(DEMO) return; LS.set(K.tx,TX); LS.set(K.rules,RULES_USER); LS.set(K.over,OVERRIDE); LS.set(K.cats,CATS); LS.set(K.files,FILES); LS.set(K.dismiss,DISMISSED); LS.set(K.deleted, Array.from(DELETED)); }
 
 /* ============================ import ============================ */
 const $ = s => document.querySelector(s);
@@ -1557,7 +1561,7 @@ async function handleFiles(list){
       const info = parseFile(f.name, wb);
       const have = new Set(TX.map(t=>t.id));
       let n=0;
-      for(const t of info.tx) if(!have.has(t.id)){ TX.push(t); have.add(t.id); n++; }
+      for(const t of info.tx) if(!have.has(t.id) && !DELETED.has(t.id)){ TX.push(t); have.add(t.id); n++; }
       added += n;
       const rec = {name:f.name, kind:info.kind, when:new Date().toISOString(),
                    rows:info.tx.length, novos:n, invMonth:info.invMonth, from:info.from, to:info.to};
@@ -2609,7 +2613,7 @@ function renderAlerts(list){
     const tot = stale.reduce((s,t)=>s+t.amount,0);
     a.innerHTML = `<span><b>${stale.length}</b> gasto${stale.length>1?'s':''} provisório${stale.length>1?'s':''} com mais de 45 dias sem par na fatura — ${brl(tot)}. Pode ser compra parcelada ou cancelada.</span>`;
     const btn = el('button','btn ghost tiny aact','apagar');
-    btn.onclick = ()=>{ const ids = new Set(stale.map(t=>t.id)); TX = TX.filter(t=>!ids.has(t.id)); save(); render(); };
+    btn.onclick = ()=>{ forgetTx(stale.map(t=>t.id)); save(); render(); };
     a.appendChild(btn); box.appendChild(a);
   }
   const dupes = findDupes(list);
@@ -2625,7 +2629,7 @@ function renderAlerts(list){
       info.appendChild(el('div','dupd', 'fatura ' + d.a.date.split('-').reverse().join('/') + ' · extrato ' + d.b.date.split('-').reverse().join('/')));
       const acts = el('div','row');
       const del = el('button','btn ghost tiny','remover do extrato');
-      del.onclick = ()=>{ TX = TX.filter(x=>x.id!==d.b.id); save(); render(); };
+      del.onclick = ()=>{ forgetTx([d.b.id]); save(); render(); };
       const keep = el('button','btn ghost tiny','são diferentes');
       keep.onclick = ()=>{ DISMISSED.push(d.key); save(); render(); };
       acts.append(del, keep);
@@ -2679,7 +2683,7 @@ function renderTable(list){
     if(t.prov){
       m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : t.source==='print' ? 'fatura aberta · provisório' : 'provisório'));
       const del = el('button','fixdel','×'); del.title = 'apagar este provisório'; del.setAttribute('aria-label','Apagar provisório');
-      del.onclick = ev => { ev.stopPropagation(); TX = TX.filter(x=>x!==t); delete OVERRIDE[t.id]; save(); render(); };
+      del.onclick = ev => { ev.stopPropagation(); forgetTx([t.id]); delete OVERRIDE[t.id]; save(); render(); };
       m.appendChild(del);
     }
     const ct = document.createElement('td');
@@ -2902,15 +2906,17 @@ $('#expJson').onclick = ()=>{
   const hoje = new Date().toISOString().slice(0,10);
   saveFile('backup-onde-foi-o-dinheiro-'+hoje+'.json', JSON.stringify({
     v:2, exportado:new Date().toISOString(),
-    tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED, budget:BUDGET
+    tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED, budget:BUDGET, deleted:Array.from(DELETED)
   }));
 };
 /* junta um backup (ou o que está na nuvem) com o que já está aqui; devolve quantos lançamentos são novos */
 function mergeBackup(b){
   if(DEMO){ DEMO=false; TX=LS.get(K.tx, []); curMonth=null; }
+  if(Array.isArray(b.deleted)) b.deleted.forEach(id=>DELETED.add(id));
+  forgetTx([]);
   const have = new Set(TX.map(t=>t.id));
   let n = 0;
-  for(const t of b.tx) if(!have.has(t.id)){
+  for(const t of b.tx) if(!have.has(t.id) && !DELETED.has(t.id)){
     // lançamento escrito à mão (ex.: tirado de um print) chega sem estabelecimento nem categoria
     if(!t.merchant) t.merchant = merchantOf(t.raw);
     if(!t.cat){ const [c,s] = autoCategory((t.raw||'')+' '+(t.detail||''), t.amount<0, t.source); t.cat = c; t.sub = s; }
@@ -2967,7 +2973,7 @@ $('#wipe').onclick = ()=>{
     return;
   }
   clearTimeout(wipeTimer); wipeArmed=false; b.textContent='Apagar tudo';
-  DEMO=false; TX=[]; RULES_USER={}; OVERRIDE={}; CATS=JSON.parse(JSON.stringify(DEFAULT_CATS)); FILES=[]; DISMISSED=[];
+  DEMO=false; TX=[]; RULES_USER={}; OVERRIDE={}; CATS=JSON.parse(JSON.stringify(DEFAULT_CATS)); FILES=[]; DISMISSED=[]; DELETED=new Set();
   avgMonths=null; LS.del(K.avg);
   FIXED=null; LS.del(K.fixed); LS.del(K.fixedSeed);
   BUDGET=null; LS.del(K.budget);
@@ -3084,7 +3090,7 @@ function reconcileProvisional(){
     if(OVERRIDE[p.id]){ if(!OVERRIDE[best.id]) OVERRIDE[best.id] = OVERRIDE[p.id]; delete OVERRIDE[p.id]; }
     else if(p.source==='manual' && !RULES_USER[best.merchant] && !OVERRIDE[best.id]) OVERRIDE[best.id] = {cat:p.cat, sub:p.sub};
   }
-  if(gone.size) TX = TX.filter(t=>!gone.has(t.id));
+  if(gone.size) forgetTx(Array.from(gone));
   return gone.size;
 }
 // provisório velho sem par: provavelmente parcelado ou cancelado — vira aviso
@@ -3146,7 +3152,7 @@ async function pullInbox(){
   let n = 0;
   for(const r of data){
     const id = 'ap'+r.id;
-    if(have.has(id)) continue;
+    if(have.has(id) || DELETED.has(id)) continue;
     const t = mkTx({ id, date: iso(new Date(r.quando)), raw: r.loja || 'Apple Pay', amount: Number(r.valor),
       source:'applepay', method:'Crédito', isIncome:false, card: r.cartao || '' });
     t.prov = true; t.mv = MERCHANT_V;
@@ -3217,7 +3223,7 @@ async function openAtalho(){
    tabela (veja supabase.sql). Vazios, o app continua só local, como antes. */
 var SUPA_URL = 'https://wicijaskeaiplfucifta.supabase.co';
 var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpY2lqYXNrZWFpcGxmdWNpZnRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE4NzgsImV4cCI6MjEwNzIxNzg3OH0.RDu947wTaCqh8dGApLy1m3C3tH8j3lme4GGiYY8lD8M';
-var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','budget'];
+var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','budget','deleted'];
 var CLOUD_DIRTY = 'c6.cloud.dirty', CLOUD_AT = 'c6.cloud.at';
 var supa = null, cloudUser = null, cloudState = 'off', cloudMsg = '', pushTimer = null, applying = false, syncing = false;
 
@@ -3240,7 +3246,7 @@ function applyState(s){
   applying = false;
   DEMO = false;
   TX = LS.get(K.tx, []); RULES_USER = LS.get(K.rules, {}); OVERRIDE = LS.get(K.over, {});
-  CATS = LS.get(K.cats, DEFAULT_CATS); FILES = LS.get(K.files, []); DISMISSED = LS.get(K.dismiss, []);
+  CATS = LS.get(K.cats, DEFAULT_CATS); FILES = LS.get(K.files, []); DISMISSED = LS.get(K.dismiss, []); DELETED = new Set(LS.get(K.deleted, []));
   FIXED = LS.get(K.fixed, null); BUDGET = LS.get(K.budget, null);
   const av = LS.get(K.avg, null); avgMonths = av ? new Set(av) : null;
   renderFiles(); render();
