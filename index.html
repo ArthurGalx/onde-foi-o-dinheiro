@@ -505,7 +505,7 @@ td.amt.neg{color:var(--pos)}
 .syncform .btn,.syncpill{display:inline-flex;align-items:center;gap:7px;min-height:38px}
 .syncpill{border:1px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:500}
 .syncpill.ok{color:var(--pos);border-color:var(--pos-soft);background:var(--pos-soft)}
-.syncpill.saving{color:var(--ink-3)}
+.syncpill.saving,.syncpill.pulling{color:var(--ink-3)}
 .syncpill.err{color:var(--crit);border-color:var(--crit-soft);background:var(--crit-soft)}
 .syncout{border:0;background:transparent;color:var(--ink-3);font-size:12.5px;padding:8px 6px;min-height:38px}
 .syncout:hover{color:var(--ink)}
@@ -984,7 +984,8 @@ const INCOME_RULES = [
 /* ============================ util ============================ */
 const LS = {
   get(k, d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
-  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} cloudDirty(k); },
+  // gravar o mesmo valor de novo não é mudança — não marca nada para subir
+  set(k, v){ try{ const s = JSON.stringify(v); if(localStorage.getItem(k) === s) return; localStorage.setItem(k, s); }catch(e){} cloudDirty(k); },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} cloudDirty(k); }
 };
 const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2', budget:'c6.budget.v1' };
@@ -3153,21 +3154,30 @@ function markSynced(at){
   try{ localStorage.removeItem(CLOUD_DIRTY); localStorage.setItem(CLOUD_AT, at||''); }catch(e){}
 }
 
+// primeiro só a data (alguns bytes); o estado inteiro (~300 KB) só quando mudou
+async function cloudStamp(){
+  const { data, error } = await supa.from('dados').select('atualizado').maybeSingle();
+  if(error) throw error;
+  return data ? data.atualizado : null;
+}
 async function cloudFetch(){
   const { data, error } = await supa.from('dados').select('estado, atualizado').maybeSingle();
   if(error) throw error;
   return data;
 }
+const lastSyncAt = () => { try{ return localStorage.getItem(CLOUD_AT)||''; }catch(e){ return ''; } };
 async function cloudPush(){
   if(!supa || !cloudUser || syncing) return;
   syncing = true; setCloud('saving');
   try{
     // outro aparelho salvou depois da última vez que puxamos? junta antes de sobrescrever
-    const remote = await cloudFetch();
-    let lastAt = ''; try{ lastAt = localStorage.getItem(CLOUD_AT)||''; }catch(e){}
-    if(remote && remote.atualizado !== lastAt && remote.estado && Array.isArray(remote.estado.tx)){
-      applying = true; mergeBackup(remote.estado); applying = false;
-      renderFiles(); render();
+    const stamp = await cloudStamp();
+    if(stamp && stamp !== lastSyncAt()){
+      const remote = await cloudFetch();
+      if(remote && remote.estado && Array.isArray(remote.estado.tx)){
+        applying = true; mergeBackup(remote.estado); applying = false;
+        renderFiles(); render();
+      }
     }
     const at = new Date().toISOString();
     const { error } = await supa.from('dados').upsert({ user_id: cloudUser.id, estado: snapshot(), atualizado: at });
@@ -3181,10 +3191,14 @@ async function cloudPush(){
 }
 async function cloudPull(){
   if(!supa || !cloudUser || syncing) return;
-  syncing = true; setCloud('saving');
+  syncing = true;
   try{
+    // nada mudou na nuvem e nada mudou aqui: não baixa nada nem mexe no selo
+    const stamp = await cloudStamp();
+    if(stamp && stamp === lastSyncAt() && !isCloudDirty()){ syncing = false; if(cloudState!=='ok') setCloud('ok'); return; }
+    setCloud('pulling');
     const remote = await cloudFetch();
-    let lastAt = ''; try{ lastAt = localStorage.getItem(CLOUD_AT)||''; }catch(e){}
+    const lastAt = lastSyncAt();
     syncing = false;
     if(!remote || !remote.estado || !Array.isArray(remote.estado.tx)){
       // conta nova: o que já está neste aparelho vira o começo da nuvem
@@ -3234,7 +3248,7 @@ function renderSync(){
   }
   const pill = el('button','syncpill '+cloudState);
   pill.type = 'button';
-  const txt = cloudState==='saving' ? 'Salvando…' : cloudState==='err' ? (cloudMsg||'erro')+' — tentar de novo' : 'Sincronizado';
+  const txt = cloudState==='saving' ? 'Salvando…' : cloudState==='pulling' ? 'Atualizando…' : cloudState==='err' ? (cloudMsg||'erro')+' — tentar de novo' : 'Sincronizado';
   pill.innerHTML = CLOUD_ICON;
   pill.appendChild(el('span', null, txt));
   pill.title = cloudUser.email || '';
