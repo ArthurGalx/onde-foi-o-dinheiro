@@ -2677,7 +2677,7 @@ function renderTable(list){
     ds.appendChild(el('span','raw', t.raw + (t.parcela && t.parcela!=='Única' ? ' · '+t.parcela : '')));
     if(isShifted(t)) m.appendChild(el('span','shift','conta de '+monthLabel(mOf(t))));
     if(t.prov){
-      m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : 'provisório'));
+      m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : t.source==='print' ? 'fatura aberta · provisório' : 'provisório'));
       const del = el('button','fixdel','×'); del.title = 'apagar este provisório'; del.setAttribute('aria-label','Apagar provisório');
       del.onclick = ev => { ev.stopPropagation(); TX = TX.filter(x=>x!==t); delete OVERRIDE[t.id]; save(); render(); };
       m.appendChild(del);
@@ -2910,7 +2910,14 @@ function mergeBackup(b){
   if(DEMO){ DEMO=false; TX=LS.get(K.tx, []); curMonth=null; }
   const have = new Set(TX.map(t=>t.id));
   let n = 0;
-  for(const t of b.tx) if(!have.has(t.id)){ TX.push(t); have.add(t.id); n++; }
+  for(const t of b.tx) if(!have.has(t.id)){
+    // lançamento escrito à mão (ex.: tirado de um print) chega sem estabelecimento nem categoria
+    if(!t.merchant) t.merchant = merchantOf(t.raw);
+    if(!t.cat){ const [c,s] = autoCategory((t.raw||'')+' '+(t.detail||''), t.amount<0, t.source); t.cat = c; t.sub = s; }
+    if(!t.month) t.month = t.date.slice(0,7);
+    t.mv = t.mv || MERCHANT_V;
+    TX.push(t); have.add(t.id); n++;
+  }
   Object.assign(RULES_USER, b.rules||{});
   Object.assign(OVERRIDE, b.over||{});
   if(b.cats) for(const c in b.cats){
@@ -3049,15 +3056,21 @@ goPage(PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : (VIEW.g
    sai — levando junto a categoria que você tiver escolhido para ele. */
 const dayNum = d => new Date(d+'T12:00:00').getTime()/864e5;
 const wordsOf = s => new Set(norm(s).split(/[^A-Z0-9]+/).filter(w=>w.length>=3));
+// "2 / 2" e "2/2" são a mesma parcela; "Única" e vazio são compra à vista
+const parcOf = t => { const m = /^(\d+)\s*\/\s*(\d+)$/.exec(String(t.parcela||'').trim()); return m ? m[1]+'/'+m[2] : ''; };
 function reconcileProvisional(){
   const prov = TX.filter(t=>t.prov);
   if(!prov.length) return 0;
-  const offi = TX.filter(t=>!t.prov && t.amount>0);
+  // quem vale mais: oficial (fatura/extrato) > print da fatura aberta > Apple Pay e "+ gasto"
+  const rank = t => !t.prov ? 2 : t.source==='print' ? 1 : 0;
   const used = new Set(), gone = new Set();
   for(const p of prov){
     let best = null, bestScore = -Infinity;
     const wp = wordsOf(p.raw+' '+p.merchant);
-    for(const o of offi){
+    for(const o of TX){
+      if(o.amount <= 0 || rank(o) <= rank(p) || gone.has(o.id)) continue;
+      // print é da fatura do cartão: só casa com a fatura, e parcela 2/2 não é a 1/2 do mês passado
+      if(p.source==='print' && (o.source!=='fatura' || parcOf(p) !== parcOf(o))) continue;
       if(used.has(o.id) || Math.abs(o.amount-p.amount) > 0.01) continue;
       const dd = Math.abs(dayNum(o.date)-dayNum(p.date));
       if(dd > 4) continue;
