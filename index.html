@@ -563,6 +563,16 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 .empty-inv .ichart,.empty-inv .mnames{display:none}
 @media(max-width:760px){.ilbl{font-size:9px}.ichart{gap:4px}}
 
+/* tipo do lançamento */
+.gtipos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--surface-2);border-radius:12px;padding:4px;margin-bottom:16px}
+.gtipo{border:0;background:transparent;color:var(--ink-2);border-radius:9px;padding:9px 6px;font-weight:600;font-size:13px;min-height:42px}
+.gtipo[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.gtipo[data-tipo="resgate"][aria-checked="true"]{color:var(--warn)}
+.gtipo[data-tipo="aplicacao"][aria-checked="true"]{color:var(--invest)}
+#gastoDlg:not([data-tipo="gasto"]) .gasto-only{display:none}
+#gastoDlg[data-tipo="gasto"] .inv-only{display:none}
+.gfield select{min-height:44px}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -625,7 +635,7 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
     </div>
     <div class="controls" id="monthBar">
       <div class="months" id="months"></div>
-      <button class="btn tiny addbtn" id="addGasto">+ gasto</button>
+      <button class="btn tiny addbtn" id="addGasto">+ lançamento</button>
     </div>
 
     <div class="page" data-page="inicio">
@@ -816,13 +826,19 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 </div>
 <dialog class="dlg" id="gastoDlg" aria-labelledby="gTitle">
   <form method="dialog" id="gForm">
-    <div class="dhead"><h2 id="gTitle">Novo gasto</h2><button type="button" class="fixdel" id="gClose" aria-label="Fechar">×</button></div>
+    <div class="dhead"><h2 id="gTitle">Novo lançamento</h2><button type="button" class="fixdel" id="gClose" aria-label="Fechar">×</button></div>
+    <div class="gtipos" role="radiogroup" aria-label="Tipo">
+      <button type="button" class="gtipo" data-tipo="gasto" role="radio">Gasto</button>
+      <button type="button" class="gtipo" data-tipo="resgate" role="radio">Tirei do investimento</button>
+      <button type="button" class="gtipo" data-tipo="aplicacao" role="radio">Investi</button>
+    </div>
     <label class="gfield"><span class="eyebrow">valor</span>
       <span class="moneybox"><span class="cur">R$</span><input id="gValor" inputmode="decimal" autocomplete="off" placeholder="0,00"></span></label>
-    <label class="gfield"><span class="eyebrow">o que foi (opcional)</span><input type="text" id="gDesc" placeholder="ex.: iFood, mercado, presente da mãe"></label>
-    <div class="gfield"><span class="eyebrow">categoria (opcional — sem escolher, o app tenta adivinhar)</span><div class="gcats" id="gCats"></div></div>
+    <label class="gfield inv-only"><span class="eyebrow" id="gOndeLbl">de onde saiu</span><select id="gOnde"></select></label>
+    <label class="gfield"><span class="eyebrow" id="gDescLbl">o que foi (opcional)</span><input type="text" id="gDesc" placeholder="ex.: iFood, mercado, presente da mãe"></label>
+    <div class="gfield gasto-only"><span class="eyebrow">categoria (opcional — sem escolher, o app tenta adivinhar)</span><div class="gcats" id="gCats"></div></div>
     <label class="gfield"><span class="eyebrow">data</span><input type="date" id="gData"></label>
-    <p class="fnote">Entra como <b>provisório</b>: conta no orçamento agora e é trocado pelo lançamento da fatura quando você importar.</p>
+    <p class="fnote" id="gNota">Entra como <b>provisório</b>: conta no orçamento agora e é trocado pelo lançamento da fatura quando você importar.</p>
     <div class="row" style="justify-content:flex-end"><span class="fnote" id="gMsg" style="color:var(--crit)"></span><button class="btn" type="submit">Salvar</button></div>
   </form>
 </dialog>
@@ -2175,7 +2191,7 @@ function renderInvest(ms){
       const r = el('div','invrow');
       r.appendChild(icoEl(t.amount>0 ? 'cofre' : 'entrada', t.amount>0 ? 'var(--invest)' : 'var(--warn)', 16));
       const nm = el('div'); nm.style.flex='1'; nm.style.minWidth='0';
-      nm.append(el('div','bn', (t.amount>0 ? 'Aplicação' : 'Resgate')+(e.sub ? ' · '+e.sub : '')), el('div','bk', ptDate(t.date)+' · '+pretty(t.merchant)));
+      nm.append(el('div','bn', (t.amount>0 ? 'Aplicação' : 'Resgate')+(e.sub ? ' · '+e.sub : '')), el('div','bk', ptDate(t.date)+' · '+(t.note ? (t.amount>0 ? '' : 'para ')+t.note : pretty(t.merchant))));
       const v = el('div','invv'+(t.amount<0?' neg':''), (t.amount>0?'':'−')+brl(Math.abs(t.amount)));
       r.append(nm, v);
       lst.appendChild(r);
@@ -2791,7 +2807,7 @@ function renderTable(list){
     const ds = el('td','desc');
     const m = el('span','m', pretty(t.merchant));
     ds.appendChild(m);
-    ds.appendChild(el('span','raw', t.raw + (t.parcela && t.parcela!=='Única' ? ' · '+t.parcela : '')));
+    ds.appendChild(el('span','raw', t.raw + (t.parcela && t.parcela!=='Única' ? ' · '+t.parcela : '') + (t.note ? ' · '+t.note : '')));
     if(isShifted(t)) m.appendChild(el('span','shift','conta de '+monthLabel(mOf(t))));
     if(t.prov) m.appendChild(el('span','shift prov', t.source==='applepay' ? 'Apple Pay · provisório' : t.source==='print' ? 'fatura aberta · provisório' : 'provisório'));
     // provisório sai com um toque; lançamento de arquivo pede confirmação — e não volta ao reimportar
@@ -3198,7 +3214,7 @@ function reconcileProvisional(){
     let best = null, bestScore = -Infinity;
     const wp = wordsOf(p.raw+' '+p.merchant);
     for(const o of TX){
-      if(o.amount <= 0 || rank(o) <= rank(p) || gone.has(o.id)) continue;
+      if(Math.sign(o.amount) !== Math.sign(p.amount) || rank(o) <= rank(p) || gone.has(o.id)) continue;
       // print é da fatura do cartão: só casa com a fatura, e parcela 2/2 não é a 1/2 do mês passado
       if(p.source==='print' && (o.source!=='fatura' || parcOf(p) !== parcOf(o))) continue;
       if(used.has(o.id) || Math.abs(o.amount-p.amount) > 0.01) continue;
@@ -3211,6 +3227,7 @@ function reconcileProvisional(){
     }
     if(!best) continue;
     used.add(best.id); gone.add(p.id);
+    if(p.note && !best.note) best.note = p.note;
     if(OVERRIDE[p.id]){ if(!OVERRIDE[best.id]) OVERRIDE[best.id] = OVERRIDE[p.id]; delete OVERRIDE[p.id]; }
     else if(p.source==='manual' && !RULES_USER[best.merchant] && !OVERRIDE[best.id]) OVERRIDE[best.id] = {cat:p.cat, sub:p.sub};
   }
@@ -3228,10 +3245,32 @@ function addProvisional(t){
 }
 
 /* ---- "+ gasto": lançar na hora, à mão ---- */
-let gastoCat = null;
+let gastoCat = null, gastoTipo = 'gasto';
+const TIPOS = {
+  gasto:     { desc:'o que foi (opcional)', ph:'ex.: iFood, mercado, presente da mãe',
+               nota:'Entra como <b>provisório</b>: conta no orçamento agora e é trocado pelo lançamento da fatura quando você importar.' },
+  resgate:   { onde:'de onde saiu', desc:'para quê (opcional)', ph:'ex.: notebook, viagem, emergência',
+               nota:'Não é renda nem gasto: o mês mostra quanto <b>saiu dos investimentos</b>. A compra em si entra como gasto normal. Fica provisório até o resgate aparecer no extrato.' },
+  aplicacao: { onde:'para onde foi', desc:'observação (opcional)', ph:'ex.: reserva de emergência',
+               nota:'Conta como <b>guardado</b>, não como gasto. Fica provisório até a aplicação aparecer no extrato.' }
+};
+function setTipo(t){
+  gastoTipo = t;
+  const dlg = $('#gastoDlg');
+  dlg.dataset.tipo = t;
+  dlg.querySelectorAll('.gtipo').forEach(b=>b.setAttribute('aria-checked', String(b.dataset.tipo===t)));
+  const T = TIPOS[t];
+  $('#gDescLbl').textContent = T.desc; $('#gDesc').placeholder = T.ph; $('#gNota').innerHTML = T.nota;
+  if(T.onde) $('#gOndeLbl').textContent = T.onde;
+}
 function openGasto(){
   const dlg = $('#gastoDlg');
   gastoCat = null;
+  const onde = $('#gOnde'); onde.innerHTML = '';
+  (CATS['Investimento']||['CDB']).forEach(x=>{ const o = document.createElement('option'); o.value = x; o.textContent = x; onde.appendChild(o); });
+  if((CATS['Investimento']||[]).includes('CDB')) onde.value = 'CDB';
+  dlg.querySelectorAll('.gtipo').forEach(b=> b.onclick = ()=> setTipo(b.dataset.tipo));
+  setTipo('gasto');
   $('#gValor').value = ''; $('#gDesc').value = ''; $('#gData').value = iso(new Date());
   $('#gMsg').textContent = '';
   const grid = $('#gCats'); grid.innerHTML = '';
@@ -3254,6 +3293,18 @@ function saveGasto(e){
   if(!(v > 0)){ $('#gMsg').textContent = 'Coloque o valor.'; return; }
   const desc = $('#gDesc').value.trim();
   const date = $('#gData').value || iso(new Date());
+  if(gastoTipo !== 'gasto'){
+    // resgate é dinheiro voltando da aplicação (negativo, como no extrato); aplicação, positivo
+    const sub = $('#gOnde').value || 'Outros';
+    const resg = gastoTipo === 'resgate';
+    addProvisional({ id:'m'+Date.now().toString(36), date, month:date.slice(0,7),
+      raw: (resg ? 'Resgate de ' : 'Aplicação em ') + sub, detail:'', note: desc,
+      merchant: (resg ? 'Resgate de ' : 'Aplicação em ') + sub, amount: (resg ? -1 : 1) * Math.round(v*100)/100,
+      source:'manual', method:'Investimento', parcela:'', card:'', cat:'Investimento', sub, auto:false, prov:true, mv:MERCHANT_V });
+    $('#gastoDlg').close();
+    render();
+    return;
+  }
   let cat = gastoCat, sub = '';
   const [ac, as] = desc ? autoCategory(desc, false, 'manual') : [null, ''];
   if(cat) sub = ac===cat ? as : ((CATS[cat]||[])[0] || '');
