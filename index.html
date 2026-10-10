@@ -116,8 +116,8 @@ input[type=password]{font-family:var(--f-mono);letter-spacing:.1em;width:130px}
 .tile.hero .delta.up{color:var(--hero-up)} .tile.hero .delta.down{color:var(--hero-down)}
 
 /* panels */
-.grid{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;align-items:start}
-@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
 .phead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:16px}
 .phead h2{font-size:17px}
@@ -430,6 +430,53 @@ td.amt.neg{color:var(--pos)}
 #alerts:empty{display:none}
 .insights + .alerts{margin-top:10px}
 
+/* orçamento */
+.budgetsec{margin-bottom:22px}
+.budgetsec .sechead .note{display:block}
+.btop{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:14px}
+.bhero .bsub{margin-top:10px;color:var(--hero-ink-2);font-size:14px}
+.bhero .bright{text-align:right}
+.bhero .bv{font:600 22px var(--f-mono)}
+.bhero .bd{font:500 13px var(--f-mono);color:var(--hero-ink-2)}
+.bmonth{position:relative;height:18px;background:rgba(255,255,255,.1);border-radius:9px}
+.bfill{position:absolute;left:0;top:0;bottom:0;background:var(--hero-down);border-radius:9px;transition:width .3s}
+.bfill.hot{background:var(--hero-up)}
+.bmonth .bmark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--hero-ink)}
+.blegend{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font:500 12px var(--f-mono);color:var(--hero-ink-2)}
+.blegend span:nth-child(2){text-align:center}
+.bmetalbl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.balerts{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.balerts:empty{display:none}
+.balert{flex:1 1 260px;display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:16px;background:var(--warn-soft)}
+.balert.over{background:var(--crit-soft)}
+.balert .ico{width:36px;height:36px;border-radius:10px}
+.balert .it{font-weight:600;font-size:14px}
+.balert .id{font-size:13px;color:var(--ink-2)}
+.brow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:14px 0;border-top:1px solid var(--line)}
+.brow:first-child{border-top:0;padding-top:4px}
+.bname{display:flex;align-items:center;gap:12px;flex:1 1 210px;min-width:0}
+.bname .ico{width:42px;height:42px;border-radius:12px}
+.bn{font-weight:600;font-size:15px}
+.bk{font-size:12.5px;color:var(--ink-3)}
+.bmid{flex:3 1 300px;min-width:0}
+.btrack{position:relative;height:12px;background:var(--surface-2);border-radius:6px}
+.btrack > div:first-child{position:absolute;left:0;top:0;bottom:0;border-radius:6px;transition:width .3s}
+.btrack .bmark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink-2);opacity:.55}
+.binfo{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:12.5px}
+.bleft{font-weight:600;color:var(--ink-2)}
+.bleft.neg{color:var(--crit)}
+.bpct{font-family:var(--f-mono);color:var(--ink-3)}
+.bval{display:flex;align-items:center;gap:8px;flex:0 0 auto;flex-wrap:wrap}
+.bval .bs{font:600 14px var(--f-mono)}
+.bval .bde{font-size:13px;color:var(--ink-3)}
+.bpill{font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;white-space:nowrap;min-width:84px;text-align:center}
+.bpill.ok{background:var(--pos-soft);color:var(--pos)}
+.bpill.warn{background:var(--warn-soft);color:var(--warn)}
+.bpill.over{background:var(--crit-soft);color:var(--crit)}
+.bpill.paid{background:var(--surface-2);color:#2563C9}
+.bunset{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:14px;margin-top:8px;border-radius:14px;border:1.5px dashed var(--line-strong)}
+.ico.dashed{width:40px;height:40px;border-radius:12px;border:2px dashed var(--ink-3);color:var(--ink-2);box-sizing:border-box}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -489,6 +536,25 @@ td.amt.neg{color:var(--pos)}
 
     <section class="herorow" id="tiles"></section>
 
+    <section class="budgetsec hidden" id="budgetSec">
+      <div class="sechead">
+        <div><h2 id="bTitle">Orçamento do mês</h2><span class="note" id="bNote"></span></div>
+        <button class="btn ghost tiny" id="bReset">voltar às sugestões</button>
+      </div>
+      <div class="btop">
+        <div class="hero bhero" id="bHero"></div>
+        <div class="sidetiles">
+          <div class="stile" id="bProj"></div>
+          <div class="stile" id="bMeta"></div>
+        </div>
+      </div>
+      <div class="balerts" id="bAlerts"></div>
+      <div class="panel big">
+        <div class="phead"><div><h2>Por categoria</h2><span class="note" id="bRef"></span></div></div>
+        <div id="budget"></div>
+      </div>
+    </section>
+
     <section class="duo">
       <div class="panel big donutpanel">
         <div class="phead"><div><h2>Para onde foi</h2><span class="note">cada fatia é uma categoria</span></div></div>
@@ -531,45 +597,6 @@ td.amt.neg{color:var(--pos)}
     </section>
 
     <div class="grid">
-
-      <section class="panel collapsible" data-collapse="plano" id="planPanel" style="grid-column:1/-1">
-        <div class="phead">
-          <h2>Planejar <span id="planMonthName">o próximo mês</span></h2>
-          <span class="note">parte das suas médias e você ajusta o que quer mudar</span>
-        </div>
-
-        <div class="planhead">
-          <div class="planbig">
-            <div class="eyebrow">sobra prevista</div>
-            <div class="num planleft" id="planLeft">—</div>
-            <div class="planwhy" id="planWhy"></div>
-          </div>
-          <div class="planinputs">
-            <label class="planfield">
-              <span class="eyebrow">receita esperada</span>
-              <span class="moneybox"><span class="cur">R$</span><input type="number" id="planReceita" step="50" min="0"></span>
-              <span class="planhint" id="hintReceita"></span>
-            </label>
-            <label class="planfield">
-              <span class="eyebrow">quero investir</span>
-              <span class="moneybox"><span class="cur">R$</span><input type="number" id="planInvest" step="50" min="0"></span>
-              <span class="planhint" id="hintInvest"></span>
-            </label>
-            <div class="planfield">
-              <span class="eyebrow">mês</span>
-              <select id="planMonth"></select>
-              <span class="planhint">as médias vêm dos meses marcados em “Média por categoria”</span>
-            </div>
-          </div>
-        </div>
-
-        <div id="planCats"></div>
-
-        <div class="row" style="justify-content:flex-start;margin-top:16px">
-          <button class="btn ghost tiny" id="planFromAvg">usar as médias em tudo</button>
-          <button class="btn ghost tiny" id="planZero">zerar tudo</button>
-        </div>
-      </section>
 
       <section class="panel collapsible collapsed" data-collapse="fixed" id="fixedPanel" style="grid-column:1/-1">
         <div class="phead">
@@ -824,59 +851,91 @@ td.amt.neg{color:var(--pos)}
 
 /* ============================ categorias ============================ */
 const DEFAULT_CATS = {
-  'Receita':        ['Trabalho','Benefício','Família','Estorno','Outras entradas'],
-  'Assinaturas':    ['Streaming','IA e software','Academia','Notícias','Educação','Outras'],
-  'Casa':           ['Aluguel e condomínio','Contas','Móveis e reforma','Lavanderia','Manutenção','Farmácia e higiene'],
-  'Comida':         ['Mercado','Delivery','Restaurante'],
-  'Crédito':        ['Anuidade e tarifas','Seguros','Juros'],
-  'Imposto':        ['Impostos e taxas'],
-  'Investimento':   ['Tesouro Direto','CDB','Outros'],
-  'Não planejado':  ['Compras online','Roupas','Presentes','Pessoas','A classificar'],
-  'Transporte':     ['App','Público','Viagem','Carro'],
-  'Transferência':  ['Entre contas próprias','Para terceiros']
+  'Receita':           ['Trabalho','Benefício','Família','Estorno','Outras entradas'],
+  'Casa':              ['Aluguel e condomínio','Contas','Móveis e reforma','Lavanderia','Manutenção'],
+  'Comida':            ['Mercado','Delivery','Restaurante'],
+  'Transporte':        ['App','Público','Carro'],
+  'Viagem':            ['Passagens','Hospedagem','Milhas','Visto e documentos'],
+  'Compras':           ['Compras online','Eletrônicos','Presentes','Papelaria','Outras compras'],
+  'Roupas e cuidados': ['Roupas','Cosméticos','Barbearia e salão','Costura e reparos'],
+  'Saúde':             ['Farmácia','Consultas e exames','Plano de saúde'],
+  'Educação':          ['Cursos e vestibular','Livros','Autoescola','Intercâmbio'],
+  'Lazer e saídas':    ['Bares','Shows e ingressos','Passeios'],
+  'Pix para pessoas':  ['Amigos e rachar conta','Família','Serviços de autônomos'],
+  'Assinaturas':       ['Streaming','IA e software','Academia','Notícias','Outras'],
+  'Tarifas e seguros': ['Anuidade e tarifas','Seguros','Juros'],
+  'Impostos':          ['Impostos e taxas'],
+  'Investimento':      ['Tesouro Direto','CDB','Ações e outros','Outros'],
+  'Transferência':     ['Entre contas próprias','Para terceiros'],
+  'A classificar':     []
 };
 // não contam como gasto do mês — são movimento, não consumo
 const EXPENSE_EXCLUDE = ['Receita','Investimento','Transferência'];
+// caixa de entrada: conta no total, mas ainda não tem nome
+const UNSET = 'A classificar';
+// gasto que se repete todo mês — no orçamento conta como já comprometido
+const FIXED_CATS = ['Casa','Assinaturas','Tarifas e seguros','Impostos'];
 
 // ordem importa — primeira regra que casa vence
 const RULES = [
   // impostos e tarifas antes de tudo
-  [/\bIOF\b|\bDARF\b|IRPF|IMPOSTO|IPTU|\bDAS\b|\bINSS\b|TAXA MUNICIPAL/, 'Imposto','Impostos e taxas'],
-  [/ANUIDADE|ESTORNO TARIFA|\bTARIFA\b(?!.*ATM)|JUROS|MULTA|ENCARGOS|ANTECIPACAO/, 'Crédito','Anuidade e tarifas'],
-  [/SEGURO CONTA|SEGURO /, 'Crédito','Seguros'],
+  [/\bIOF\b|\bDARF\b|IRPF|IMPOSTO|IPTU|\bDAS\b|\bINSS\b|TAXA MUNICIPAL|SECRETARIA D|PREFEITURA|\bDETRAN\b/, 'Impostos','Impostos e taxas'],
+  [/ANUIDADE|ESTORNO TARIFA|\bTARIFA\b(?!.*ATM)|JUROS|MULTA|ENCARGOS|ANTECIPACAO/, 'Tarifas e seguros','Anuidade e tarifas'],
+  [/SEGURO CONTA|SEGURO /, 'Tarifas e seguros','Seguros'],
   // investimento
   [/TESOURO DIRETO|NTNB|\bLFT\b|\bLTN\b|IPCA\+/, 'Investimento','Tesouro Direto'],
   [/\bCDB\b|\bRDB\b|\bLCI\b|\bLCA\b/, 'Investimento','CDB'],
+  [/\bB3\b|CORRETORA|NUINVEST|XP INVEST|\bBTG\b|\bCLEAR\b|\bRICO\b|\bFII\b/, 'Investimento','Ações e outros'],
   [/APLICACAO|RESGATE|FUNDO DE INVEST|RENDA FIXA|TESOURARIA/, 'Investimento','Outros'],
-  // farmácia antes de delivery (IFD*RAIA DROGASIL)
-  [/DROGASIL|DROGARIA|\bRAIA\b|FARMACIA|PACHECO|ONOFRE|PANVEL/, 'Casa','Farmácia e higiene'],
+  // saúde antes de delivery (IFD*RAIA DROGASIL)
+  [/DROGASIL|DROGARIA|\bDROGA\b|DROGAVIVA|\bRAIA\b|FARMACIA|PACHECO|ONOFRE|PANVEL|ULTRAFARMA|PAGUE MENOS/, 'Saúde','Farmácia'],
+  [/UNIMED|\bAMIL\b|HAPVIDA|NOTREDAME|SULAMERICA SAUDE|BRADESCO SAUDE|PORTO SAUDE/, 'Saúde','Plano de saúde'],
+  [/CLINICA|LABORATORIO|HOSPITAL|ODONTO|DENTIST|FLEURY|LAVOISIER|DELBONI|PSICOLOG|FISIOTERAP|\bEXAMES?\b/, 'Saúde','Consultas e exames'],
   // assinaturas
   [/NETFLIX|SPOTIFY|DISNEY|\bHBO\b|\bMAX\b|PRIME VIDEO|DEEZER|CRUNCHYROLL|GLOBOPLAY|PARAMOUNT/, 'Assinaturas','Streaming'],
   [/ANTHROPIC|CLAUDE|OPENAI|CHATGPT|GITHUB|NOTION|CANVA|FIGMA|GOOGLE ?\*|MICROSOFT|ICLOUD|APPLE\.?COM|DROPBOX|CURSOR|PERPLEXITY|MIDJOURNEY/, 'Assinaturas','IA e software'],
   [/ACADEMIA|SMARTFIT|SMART FIT|BLUEFIT|GYMPASS|TOTALPASS|WELLHUB|CROSSFIT|PILATES/, 'Assinaturas','Academia'],
   [/ESTADAO|FOLHA DE|\bUOL\b|GLOBO\b|NEXO|PIAUI|VALOR ECON|THE ECONOMIST|NYTIMES/, 'Assinaturas','Notícias'],
-  [/PREPLY|DUOLINGO|COURSERA|UDEMY|ALURA|BABBEL|ITALKI/, 'Assinaturas','Educação'],
   [/MELIMAIS|ONE MEMBERS|UBER ?\*ONE|RAPPI PRIME|IFOOD CLUBE|AMAZON PRIME/, 'Assinaturas','Outras'],
+  // educação — autoescola antes de "escola"
+  [/\bCFC\b|AUTO ?ESCOLA/, 'Educação','Autoescola'],
+  [/INTERCAMBIO|EXCHANGE|STUDENT|\bCESE\b|EDUCATIONAL/, 'Educação','Intercâmbio'],
+  [/LIVRARIA|\bLEITURA\b|SARAIVA|ESTANTE VIRTUAL|KINDLE|\bSEBO\b/, 'Educação','Livros'],
+  [/PREPLY|DUOLINGO|COURSERA|UDEMY|ALURA|BABBEL|ITALKI|FATEC|\bETEC\b|VESTIBULAR|INSCRICAO|FUVEST|VUNESP|\bENEM\b|FACULDADE|UNIVERSIDADE|ESCOLA|COLEGIO|\bCURSO|SENAC|SENAI|FORMATURA/, 'Educação','Cursos e vestibular'],
   // moradia
   [/QUINTOANDAR|OMA CONDOMINIO|CONDOMINIO|IMOBILIARIA|ALUGUEL|LOFT\b|IMOVEL/, 'Casa','Aluguel e condomínio'],
   [/CLARO|VIVO|\bTIM\b|\bOI \b|ENEL|COMGAS|SABESP|ELETROPAULO|\bCPFL\b|NET SERV|INTERNET|TELECOM|VIVO FIBRA/, 'Casa','Contas'],
-  [/LAVANDERIA|OMOLAVAN/, 'Casa','Lavanderia'],
+  [/LAVANDERIA|OMOLAVAN|OMO LAVAN/, 'Casa','Lavanderia'],
   [/CHAVEIRO|FERRAMENTAS|ELETRICISTA|ENCANADOR|MARCENAR|VIDRACAR|PINTOR|REFORMA|CONSERTO/, 'Casa','Manutenção'],
-  [/MSCASA|OKINALAR|LEROY|TELHANORTE|CONSTRU|MADEIRA|TINTAS|MAQUINAS|MAGALUPAY|MAGAZINE LUIZA|CASA E CONSTRU|TOK ?STOK|MOBLY|ETNA|CAMICADO|MOVEIS|COLCHAO|ELETRODOMESTIC/, 'Casa','Móveis e reforma'],
+  [/MSCASA|OKINALAR|LEROY|TELHANORTE|CONSTRU|MADEIRA|TINTAS|MAQUINAS|MAGALUPAY|MAGAZINE LUIZA|CASA E CONSTRU|TOK ?STOK|MOBLY|ETNA|CAMICADO|MOVEIS|COLCHAO|ELETRODOMESTIC|MUNDIHOME|DAISO|UTILIDADES/, 'Casa','Móveis e reforma'],
+  // viagem antes de transporte: passagem e hospedagem não são o dia a dia
+  [/AIRBNB|BOOKING|HOTEL|HOSPEDAGEM|POUSADA|HOSTEL/, 'Viagem','Hospedagem'],
+  [/SMILES|LIVELO|LATAM PASS|TUDOAZUL|123MILHAS|MAXMILHAS/, 'Viagem','Milhas'],
+  [/UKVI|\bVISTO\b|CONSULADO|PASSAPORTE|POLICIA FEDERAL|\bVFS\b/, 'Viagem','Visto e documentos'],
+  [/PASSDEONIBUS|PASSAGE|LATAM|\bGOL \b|\bAZUL \b|DECOLAR|RODOVIARIA|BUSER|CLICKBUS|AGUIA BRANCA|COMETA|ITAPEMIRIM/, 'Viagem','Passagens'],
+  // compras — papelaria e eletrônicos antes dos marketplaces genéricos
+  [/KALUNGA|PAPELARIA/, 'Compras','Papelaria'],
+  [/KABUM|PICHAU|TERABYTE|FAST ?SHOP|INFORMATICA|SAMSUNG|XIAOMI|MULTILASER|ELETRONICOS/, 'Compras','Eletrônicos'],
   // marketplaces antes de "mercado" — MERCADO*MERCADOLIVRE não é supermercado
-  [/MERCADOLIVRE|MERCADO ?PAGO|MERCADO\*|MELI\b|AMAZON|SHOPEE|ALIEXPRESS|KALUNGA|AMERICANAS|CASAS BAHIA|PIX MARKETPLACE|SUBMARINO|TEMU|SHEIN/, 'Não planejado','Compras online'],
+  [/MERCADOLIVRE|MERCADO ?PAGO|MERCADO\*|MELI\b|AMAZON|SHOPEE|ALIEXPRESS|AMERICANAS|CASAS BAHIA|PIX MARKETPLACE|SUBMARINO|TEMU|SHEIN/, 'Compras','Compras online'],
+  // lazer antes de restaurante: bar é saída, não refeição
+  [/\bBAR\b|BOTECO|CHOPP|CERVEJ|\bPUB\b|BALADA/, 'Lazer e saídas','Bares'],
+  [/INGRESSO|SYMPLA|EVENTIM|TICKETMASTER|CINEMA|CINEMARK|KINOPLEX|CINEPOLIS|\bUCI\b|TEATRO|BILHETERIA/, 'Lazer e saídas','Shows e ingressos'],
+  [/PARQUE|MUSEU|ZOOLOG|BOLICHE|KARAOKE|AQUARIO/, 'Lazer e saídas','Passeios'],
   // comida
-  [/MERCADINHO|BOA HORA|HORTIFRUTI|\bMERCADO\b|CONFEITARIA|PADARIA|SUPERMERCAD|CARREFOUR|PAO DE ACUCAR|\bASSAI\b|\bDIA\b SUPER|SMART BREAK|EMPORIO|ATACAD|SACOLAO|QUITANDA|ACOUGUE|ADEGA/, 'Comida','Mercado'],
+  [/MERCADINHO|BOA HORA|HORTIFRUTI|\bMERCADO\b|CONFEITARIA|PADARIA|SUPERMERCAD|CARREFOUR|PAO DE ACUCAR|\bASSAI\b|\bDIA\b SUPER|SMART BREAK|EMPORIO|ATACAD|SACOLAO|QUITANDA|ACOUGUE|ADEGA|LIV ?UP|\bDAKI\b|MINUTO PA|CASA DE CARNE/, 'Comida','Mercado'],
   [/IFD\*|IFOOD|99 ?FOOD|99FOOD|RAPPI|UBER ?\*?EATS|DELIVERY/, 'Comida','Delivery'],
-  [/RESTAURANT|LANCHONET|\bBAR\b|PIZZARIA|BURGER|HAMBURG|SORV|GASTRONOM|CAFETERIA|\bCAFE\b|BOTECO|CANTINA|SUSHI|TEMAKI|COMIDA|COZINHA|GRILL|CHURRASC|AROMA DA MAMA|CAUCASUS|FRADIQUE|FILHAO|COOKIE/, 'Comida','Restaurante'],
-  // transporte
+  [/RESTAURANT|LANCHONET|PIZZARIA|BURGER|HAMBURG|SORV|GASTRONOM|CAFETERIA|\bCAFE\b|CANTINA|SUSHI|TEMAKI|COMIDA|COZINHA|GRILL|CHURRASC|AROMA DA MAMA|CAUCASUS|FRADIQUE|FILHAO|COOKIE|PASTEL|CHOCOLAT|GELAT|DOCERIA|\bACAI\b|CENOURADAS/, 'Comida','Restaurante'],
+  // transporte do dia a dia
   [/\bUBER\b|^99\*|\b99\*|99 ?TAXI|CABIFY|INDRIVE|\bTAXI\b/, 'Transporte','App'],
   [/BILHUNICO|BILHETE UNICO|AUTOPASS|PRODATA|TARIFA TRANS|\bJAE\b|SPTRANS|\bMETRO\b|\bCPTM\b|VIA MOBILIDADE|TRANSPORTE PUBLICO|RECARGA/, 'Transporte','Público'],
-  [/PASSDEONIBUS|SMILES|LATAM|\bGOL \b|\bAZUL \b|AIRBNB|BOOKING|DECOLAR|123MILHAS|HOTEL|HOSPEDAGEM|RODOVIARIA|BUSER|CLICKBUS/, 'Transporte','Viagem'],
   [/POSTO |\bSHELL\b|IPIRANGA|PETROBRAS|COMBUSTIVEL|ESTACIONAMENTO|ZONA AZUL|PEDAGIO|\bIPVA\b|LICENCIAMENTO|OFICINA|AUTO CENTER/, 'Transporte','Carro'],
-  // compras
-  [/SHEIN|BERSHKA|ZARA|RENNER|\bC&A\b|RIACHUELO|HERING|NIKE|ADIDAS|CENTAURO|VESTUARIO|OUTLET|CALCADOS|MODA/, 'Não planejado','Roupas'],
-  [/AMAZON|MERCADOLIVRE|MERCADO ?\*|MERCADOPAGO|SHOPEE|ALIEXPRESS|KALUNGA|AMERICANAS|CASAS BAHIA|PIX MARKETPLACE|SUBMARINO|TEMU|MAGALU|EC +\*/, 'Não planejado','Compras online']
+  // roupas e cuidados
+  [/BERSHKA|ZARA|RENNER|\bC&A\b|RIACHUELO|HERING|NIKE|ADIDAS|CENTAURO|DECATHLON|VESTUARIO|OUTLET|CALCADOS|MODA|COTTON ON|CAMISARIA|ENJOEI|CLOTHING|STUDIO Z|\bMASH/, 'Roupas e cuidados','Roupas'],
+  [/SALLVE|COSMETIC|BOTICARIO|NATURA|SEPHORA|\bAVON\b|EUDORA|PERFUM|BELEZA NA WEB|DERMAGE/, 'Roupas e cuidados','Cosméticos'],
+  [/BARBEARIA|BARBER|SALAO|CABELEIR|MANICURE|ESTETICA/, 'Roupas e cuidados','Barbearia e salão'],
+  [/COSTURA|ATELIER|BORDADO|SAPATARIA|AJUSTES/, 'Roupas e cuidados','Costura e reparos'],
+  [/MERCADO ?\*|MERCADOPAGO|MAGALU|EC +\*/, 'Compras','Compras online']
 ];
 
 const INCOME_RULES = [
@@ -891,7 +950,7 @@ const LS = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} cloudDirty(k); },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} cloudDirty(k); }
 };
-const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2' };
+const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2', budget:'c6.budget.v1' };
 
 const deaccent = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const norm = s => deaccent(String(s||'')).toUpperCase().replace(/\s+/g,' ').trim();
@@ -1039,8 +1098,9 @@ function autoCategory(raw, isIncome, source){
   for(const [re,c,sub] of RULES) if(re.test(s)) return [c,sub];
   // nome de pessoa: só letras, 3+ palavras e nenhum termo de empresa
   const company = /\b(LTDA|\bME\b|EIRELI|\bSA\b|S\/A|COMERCIO|SERVICOS|LOJA|EXEMPLO|EMPRESA|ASSOCIACAO|INDUSTRIA|DISTRIBUIDORA)\b/;
-  if(/^[A-Z][A-Z ]+$/.test(s) && s.split(' ').length>=3 && !company.test(s)) return ['Não planejado','Pessoas'];
-  return ['Não planejado','A classificar'];
+  // só Pix: no cartão, nome de três palavras costuma ser loja ("LOJASMEL SHOP BOULEVAR")
+  if(/^PIX ENVIADO/.test(s) && /^[A-Z][A-Z ]+$/.test(s) && s.split(' ').length>=3 && !company.test(s)) return ['Pix para pessoas','Amigos e rachar conta'];
+  return [UNSET, ''];
 }
 
 /* ============================ parsing ============================ */
@@ -1174,7 +1234,7 @@ let CATS = LS.get(K.cats, DEFAULT_CATS);
 let FILES = LS.get(K.files, []);
 let DISMISSED = LS.get(K.dismiss, []);
 let FIXED = LS.get(K.fixed, null);        // merchant -> {cutoff}: contas fixas mensais
-let PLAN  = LS.get(K.plan, null);         // orçamento do próximo mês
+let BUDGET = LS.get(K.budget, null);      // {limits:{categoria:valor}, meta}: orçamento do mês
 
 // aluguel, condomínio, luz e o crédito do vale-refeição caem perto da virada
 // do mês — a partir do dia de corte já valem para o mês seguinte
@@ -1261,7 +1321,8 @@ function effective(t){
   const o = OVERRIDE[t.id];
   if(o) return o;
   const r = RULES_USER[t.merchant];
-  if(r) return r;
+  // a mesma pessoa pode mandar e receber: regra de entrada não vale para o que saiu
+  if(r && !(r.cat==='Receita' && t.amount>0)) return r;
   return {cat:t.cat, sub:t.sub};
 }
 function isExpense(t){ return !EXPENSE_EXCLUDE.includes(effective(t).cat); }
@@ -1285,6 +1346,72 @@ function migrateMerchants(){
     }
   });
   if(changed) save();
+}
+
+/* categorias v2: "Não planejado" virou categorias com nome. Os lançamentos
+   antigos passam de novo pelas regras (que só existem para o automático); as suas
+   regras e correções só trocam o nome antigo pelo novo. Roda enquanto houver
+   nome antigo em algum lugar — assim também arruma o que chegar da nuvem. */
+const OLD_TO_NEW = {
+  'Não planejado|Compras online': ['Compras','Compras online'],
+  'Não planejado|Roupas':         ['Roupas e cuidados','Roupas'],
+  'Não planejado|Presentes':      ['Compras','Presentes'],
+  'Não planejado|Lazer':          ['Lazer e saídas','Passeios'],
+  'Não planejado|Pessoas':        ['Pix para pessoas','Amigos e rachar conta'],
+  // farmácia o automático já reconhece; o que você pôs aqui à mão era beleza e higiene
+  'Casa|Farmácia e higiene':      ['Roupas e cuidados','Cosméticos'],
+  'Assinaturas|Educação':         ['Educação','Cursos e vestibular'],
+  'Transporte|Viagem':            ['Viagem','Passagens']
+};
+const OLD_CATS = ['Não planejado','Crédito','Imposto'];
+function renameCat(cat, sub){
+  const m = OLD_TO_NEW[cat+'|'+sub];
+  if(m) return m;
+  if(cat==='Não planejado') return [UNSET, ''];
+  if(cat==='Crédito') return ['Tarifas e seguros', sub];
+  if(cat==='Imposto') return ['Impostos', sub];
+  return null;
+}
+function needsCatMigration(){
+  const old = e => e && (OLD_CATS.includes(e.cat) || !!OLD_TO_NEW[e.cat+'|'+e.sub]);
+  return TX.some(old) || Object.values(RULES_USER).some(old) || Object.values(OVERRIDE).some(old)
+    || OLD_CATS.some(c=>CATS[c]);
+}
+function migrateCategories(){
+  if(DEMO || !needsCatMigration()) return;
+  // destino de um Pix já reconhecido como "para você mesmo" é sempre você
+  const self = new Set(TX.filter(t=>t.cat==='Transferência' && t.sub==='Entre contas próprias').map(t=>t.merchant));
+  for(const t of TX){
+    if(t.cat==='Transferência') continue;
+    if(t.amount > 0 && self.has(t.merchant)){ t.cat='Transferência'; t.sub='Entre contas próprias'; continue; }
+    const [c,s] = autoCategory((t.raw||'')+' '+(t.detail||''), t.amount<0, t.source);
+    t.cat = c; t.sub = s;
+  }
+  /* Regra ou correção que só dizia "não sei" deixa de existir. As que foram para uma
+     categoria improvisada (barbearia em "Farmácia e higiene", Fatec em "Imposto",
+     Airbnb em "Lazer") dão lugar ao automático quando ele agora sabe a resposta. */
+  const AUTO_WINS = /^(Não planejado\|(Pessoas|Compras online|Lazer)|Casa\|Farmácia e higiene|Imposto\||Transporte\|Viagem|Assinaturas\|Educação)/;
+  const byMerchant = new Map(TX.map(t=>[t.merchant, t]));
+  const byId = new Map(TX.map(t=>[t.id, t]));
+  [[RULES_USER, byMerchant], [OVERRIDE, byId]].forEach(([obj, idx])=>{
+    for(const k of Object.keys(obj)){
+      const {cat, sub} = obj[k];
+      const r = renameCat(cat, sub);
+      if(!r) continue;
+      const t = idx.get(k);
+      if(r[0]===UNSET || (t && t.cat!==UNSET && t.cat!=='Pix para pessoas' && AUTO_WINS.test(cat+'|'+sub))) delete obj[k];
+      else obj[k] = {cat:r[0], sub:r[1]};
+    }
+  });
+  const next = JSON.parse(JSON.stringify(DEFAULT_CATS));
+  for(const c in CATS){
+    const target = c==='Crédito' ? 'Tarifas e seguros' : c==='Imposto' ? 'Impostos' : c==='Não planejado' ? null : c;
+    if(!target) continue;
+    next[target] = next[target] || [];
+    CATS[c].forEach(s=>{ if(!OLD_TO_NEW[c+'|'+s] && !next[target].includes(s)) next[target].push(s); });
+  }
+  CATS = next;
+  save();
 }
 
 function save(){ if(DEMO) return; LS.set(K.tx,TX); LS.set(K.rules,RULES_USER); LS.set(K.over,OVERRIDE); LS.set(K.cats,CATS); LS.set(K.files,FILES); LS.set(K.dismiss,DISMISSED); }
@@ -1494,6 +1621,7 @@ function render(){
   $('#app').classList.remove('hidden');
   $('#demoBanner').classList.toggle('hidden', !DEMO);
   migrateMerchants();
+  migrateCategories();
   seedFixed();
   const cov = cardCoverage();
   // abre no mês mais recente que já tem fatura fechada — senão a tela parece vazia
@@ -1536,7 +1664,7 @@ function render(){
   renderInsights(list, prevM);
   renderFixed();
   renderAverages();
-  renderPlan();
+  renderBudget();
   renderSubs();
   renderAlerts(list);
   renderTable(list);
@@ -1570,18 +1698,35 @@ const ICONS = {
   banco:'<path d="M3 9.5 12 4l9 5.5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20.5h18"/>',
   calendario:'<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   seta:'<path d="M12 5v14M6 13l6 6 6-6"/>',
-  subiu:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'
+  subiu:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  mala:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M8 7v13M16 7v13"/>',
+  caixa:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  camiseta:'<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0z"/>',
+  saude:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M12 9.5v5M9.5 12h5"/>',
+  capelo:'<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 3 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/>',
+  ingresso:'<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 7v2M14 11v2M14 15v2"/>',
+  pessoas:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14c2.2.6 3.5 2.6 3.5 6"/>',
+  duvida:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14"/><path d="M12 17h.01"/>',
+  alerta:'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+  alvo:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'
 };
 const svgIcon = (k, size) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||ICONS.tag}</svg>`;
 function icoEl(k, bg, size, fg){ const s=el('span','ico'); s.style.background=bg; if(fg) s.style.color=fg; s.innerHTML=svgIcon(k,size); return s; }
 const CAT_META = {
-  'Não planejado':{c:'#D6336C',i:'sacola'},
   'Casa':{c:'#2563C9',i:'casa'},
   'Comida':{c:'#DB7116',i:'comida'},
   'Transporte':{c:'#0E9384',i:'bus'},
-  'Assinaturas':{c:'#7A5AF0',i:'repeat'},
-  'Crédito':{c:'#4A5560',i:'cartao'},
-  'Imposto':{c:'#9A6B12',i:'imposto'},
+  'Viagem':{c:'#0B6E99',i:'mala'},
+  'Compras':{c:'#8B5E34',i:'caixa'},
+  'Roupas e cuidados':{c:'#A3369F',i:'camiseta'},
+  'Saúde':{c:'#D63A3A',i:'saude'},
+  'Educação':{c:'#8A6A00',i:'capelo'},
+  'Lazer e saídas':{c:'#D6336C',i:'ingresso'},
+  'Pix para pessoas':{c:'#5E7A1F',i:'pessoas'},
+  'Assinaturas':{c:'#6366F1',i:'repeat'},
+  'Tarifas e seguros':{c:'#4A5560',i:'cartao'},
+  'Impostos':{c:'#9A6B12',i:'imposto'},
+  'A classificar':{c:'#87938F',i:'duvida'},
   'Receita':{c:'#1B7A3F',i:'entrada'},
   'Investimento':{c:'#4A3AA7',i:'cofre'},
   'Transferência':{c:'#7C8884',i:'troca'}
@@ -1919,277 +2064,209 @@ function renderInsights(list, prevM){
   }
 }
 
-/* ---- planejamento do próximo mês ---- */
-function nextMonth(m){
+/* ---- orçamento do mês ----
+   Um limite por categoria, sugerido pela mediana dos 6 meses fechados anteriores.
+   No mês corrente mostra quanto dá para gastar por dia e como o mês fecha no ritmo
+   atual; num mês passado, como ele fechou contra os limites. */
+function saveBudget(){ if(!DEMO) LS.set(K.budget, BUDGET); }
+const ymOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+function median(xs){
+  const s = xs.slice().sort((a,b)=>a-b), n = s.length;
+  if(!n) return 0;
+  return n%2 ? s[(n-1)/2] : (s[n/2-1]+s[n/2])/2;
+}
+function suggestedLimits(m){
+  const cov = cardCoverage();
+  // 6 meses: um mês fora da curva (reforma, viagem) pesa menos na sugestão
+  const ref = months().filter(x=> x < m && (!cov || x <= cov)).sort().slice(-6);
+  const per = {};
+  ref.forEach(mm=> spendCats(txOfMonth(mm)).forEach(c=>{ (per[c.cat] = per[c.cat] || {})[mm] = c.total; }));
+  const limits = {};
+  for(const c in per){
+    if(c===UNSET) continue;
+    const v = median(ref.map(mm=>per[c][mm]||0));
+    if(v > 0) limits[c] = Math.ceil(v/50)*50;
+  }
+  return { limits, receita: median(ref.map(mm=>totals(txOfMonth(mm)).receita)), ref };
+}
+
+function renderBudget(){
+  const sec = $('#budgetSec');
+  if(curMonth==='ALL'){ sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  BUDGET = BUDGET || {limits:{}, meta:null};
+  BUDGET.limits = BUDGET.limits || {};
+  const m = curMonth;
   const [y,mm] = m.split('-').map(Number);
-  const d = new Date(y, mm, 1);
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-}
-// média por categoria e por subcategoria, nos meses marcados no painel de médias
-function avgByCat(){
-  const usados = Array.from(avgMonths || new Set(months())).sort();
-  const n = usados.length || 1;
-  const out = {}, sub = {};
-  for(const t of TX){
-    if(!usados.includes(mOf(t))) continue;
-    const e = effective(t);
-    const v = e.cat==='Receita' ? -t.amount : t.amount;
-    out[e.cat] = (out[e.cat]||0) + v;
-    sub[e.cat] = sub[e.cat] || {};
-    const s = e.sub || '—';
-    sub[e.cat][s] = (sub[e.cat][s]||0) + v;
+  const days = new Date(y, mm, 0).getDate();
+  const today = new Date();
+  const live = m === ymOf(today);
+  const day = live ? today.getDate() : days;
+  const pace = day/days;
+  const left = days - day + 1;           // inclui hoje
+  const sug = suggestedLimits(m);
+  const list = txOfMonth(m);
+  const spentBy = new Map(spendCats(list).map(c=>[c.cat, c.total]));
+
+  const names = new Set([...Object.keys(sug.limits), ...Object.keys(BUDGET.limits), ...spentBy.keys()]);
+  names.delete(UNSET);
+  const SEV = {over:0, warn:1, ok:2, paid:3};
+  const rows = Array.from(names).map(cat=>{
+    const custom = BUDGET.limits[cat] != null;
+    const limit = custom ? BUDGET.limits[cat] : (sug.limits[cat]||0);
+    const spent = spentBy.get(cat)||0;
+    const fixo = FIXED_CATS.includes(cat);
+    const r = limit>0 ? spent/limit : (spent>0 ? 2 : 0);
+    const st = fixo && r>=0.9 && r<=1.05 ? 'paid' : r>1 ? 'over' : r>=0.8 ? 'warn' : 'ok';
+    return {cat, limit, spent, fixo, r, st, custom};
+  }).filter(x=>x.limit>0 || x.spent>0)
+    .sort((a,b)=> SEV[a.st]-SEV[b.st] || b.spent-a.spent);
+  const unset = spentBy.get(UNSET)||0;
+  const plan = rows.reduce((s,x)=>s+x.limit, 0);
+  const spent = rows.reduce((s,x)=>s+x.spent, 0) + unset;
+  const remaining = plan - spent;
+  // fixo conta pelo limite (vai ser pago de qualquer jeito); o resto segue o ritmo do mês
+  const proj = live ? rows.reduce((s,x)=> s + (x.fixo ? Math.max(x.spent, x.limit) : x.spent/pace), 0) + unset/pace : spent;
+  const t = totals(list);
+  const receita = live ? Math.max(t.receita, sug.receita) : t.receita;
+  const sobra = receita - proj - t.invest;
+  const nomeMes = monthName(m);
+
+  $('#bTitle').textContent = 'Orçamento de ' + nomeMes;
+  const cov = cardCoverage();
+  $('#bNote').textContent = live
+    ? 'hoje é '+String(day).padStart(2,'0')+'/'+String(mm).padStart(2,'0')+' · faltam '+left+' dia'+(left>1?'s':'')+(cov && m > cov ? ' · compras no crédito entram quando você importar a fatura' : '')
+    : 'como o mês fechou contra os limites';
+  $('#bRef').textContent = sug.ref.length ? 'limites sugeridos pela mediana de '+sug.ref.map(monthLabel).join(', ')+' — mude o que quiser' : 'defina os limites que quiser';
+
+  // destaque
+  const hero = $('#bHero'); hero.innerHTML='';
+  const top = el('div','herotop');
+  const l = el('div');
+  if(live && remaining >= 0){
+    l.appendChild(el('div','eyebrow','você pode gastar por dia'));
+    const v = el('div','herov', reais(remaining/left)); v.appendChild(el('small',null,' /dia')); l.appendChild(v);
+    l.appendChild(el('div','bsub', reais(remaining)+' até o dia '+days+' para fechar dentro do plano de '+reais(plan)+'.'));
+  } else if(live){
+    l.appendChild(el('div','eyebrow','você já passou do plano'));
+    l.appendChild(el('div','herov', reais(-remaining)));
+    l.appendChild(el('div','bsub','Até o fim do mês, o ideal é segurar o que não for fixo.'));
+  } else {
+    l.appendChild(el('div','eyebrow','você gastou em '+nomeMes));
+    l.appendChild(el('div','herov', reais(spent)));
+    l.appendChild(el('div','bsub', (remaining>=0 ? reais(remaining)+' abaixo' : reais(-remaining)+' acima')+' do plano de '+reais(plan)+'.'));
   }
-  for(const k in out) out[k] = out[k]/n;
-  for(const c in sub) for(const s in sub[c]) sub[c][s] = sub[c][s]/n;
-  return {avg: out, sub, n, usados};
-}
-// subcategorias de uma categoria: as que têm histórico primeiro, depois o resto
-function subsOf(cat, subAvg){
-  const withData = Object.keys(subAvg[cat] || {}).sort((a,b)=> (subAvg[cat][b]||0)-(subAvg[cat][a]||0));
-  const rest = (CATS[cat]||[]).filter(s=>!withData.includes(s));
-  return withData.concat(rest);
-}
-/* uma categoria pode ser planejada de três jeitos: pelo total, quebrada em
-   subcategorias, ou item a item — que é como se planeja assinatura */
-function planMode(cat){
-  const b = PLAN.subs && PLAN.subs[cat];
-  return b ? (b.mode || 'sub') : 'total';
-}
-function planVals(cat){
-  const b = PLAN.subs && PLAN.subs[cat];
-  return b ? (b.vals || b) : {};
-}
-// os lançamentos da categoria nos últimos meses fechados, pelo valor mais recente
-function merchantRefs(cat){
-  const recent = recentMonths(2);
-  const per = new Map();
-  for(const t of TX){
-    if(effective(t).cat !== cat || t.amount <= 0) continue;
-    const m = mOf(t);
-    if(!recent.includes(m)) continue;
-    if(!per.has(t.merchant)) per.set(t.merchant, new Map());
-    const mm = per.get(t.merchant);
-    mm.set(m, (mm.get(m)||0) + t.amount);
+  const r = el('div','bright');
+  r.append(el('div','eyebrow', live ? 'gasto até hoje' : 'gasto no mês'), el('div','bv', brl(spent)), el('div','bd','de '+reais(plan)));
+  top.append(l, r);
+  const bar = el('div','bmonth');
+  const fill = el('div','bfill');
+  fill.style.width = Math.min(100, plan>0 ? spent/plan*100 : 0)+'%';
+  fill.classList.toggle('hot', plan>0 && spent/plan > (live ? pace+0.1 : 1));
+  bar.appendChild(fill);
+  if(live){ const mk = el('div','bmark'); mk.style.left = (pace*100)+'%'; bar.appendChild(mk); }
+  const legend = el('div','blegend');
+  legend.append(el('span',null,'dia 1'), el('span',null, live ? '│ hoje, dia '+day+' — o ideal seria estar em '+Math.round(pace*100)+'%' : ''), el('span',null,'dia '+days));
+  hero.append(top, bar, legend);
+
+  // previsão
+  const pj = $('#bProj'); pj.innerHTML='';
+  const diff = proj - plan;
+  pj.appendChild(icoEl('subiu', diff>0 ? 'var(--crit-soft)' : 'var(--pos-soft)', 22, diff>0 ? 'var(--crit)' : 'var(--pos)'));
+  const pb = el('div'); pb.style.flex='1'; pb.style.minWidth='0';
+  if(live){
+    pb.append(el('div','eyebrow','no ritmo atual você fecha em'), el('div','v', reais(proj)));
+  } else {
+    const dentro = rows.filter(x=>x.r<=1).length;
+    pb.append(el('div','eyebrow','categorias dentro do limite'), el('div','v', dentro+' de '+rows.length));
   }
-  const out = [];
-  per.forEach((mm, merchant)=>{
-    const ms = Array.from(mm.keys()).sort();
-    const last = ms[ms.length-1];
-    out.push({key: merchant, ref: mm.get(last), refMonth: last});
-  });
-  return out.sort((a,b)=> b.ref - a.ref);
-}
-function planItems(cat, mode, subAvg){
-  if(mode === 'merchant') return merchantRefs(cat);
-  return subsOf(cat, subAvg).map(x=>({key:x, ref:(subAvg[cat]||{})[x] || 0}));
-}
-function planCatValue(cat, avg, subAvg){
-  const mode = planMode(cat);
-  if(mode !== 'total'){
-    const vals = planVals(cat);
-    return planItems(cat, mode, subAvg)
-      .reduce((s,it)=> s + (vals[it.key] != null ? vals[it.key] : Math.round(it.ref)), 0);
+  const pd = el('div','d', Math.abs(diff)<1 ? 'exatamente no plano' : reais(Math.abs(diff))+(diff>0?' acima':' abaixo')+' do plano');
+  pd.style.color = diff>0 ? 'var(--crit)' : 'var(--pos)'; pd.style.fontWeight='600';
+  pb.appendChild(pd);
+  pj.appendChild(pb);
+
+  // meta de guardar
+  const mt = $('#bMeta'); mt.innerHTML='';
+  mt.appendChild(icoEl('alvo', 'var(--invest-soft)', 22, 'var(--invest)'));
+  const mb = el('div'); mb.style.flex='1'; mb.style.minWidth='0';
+  const lab = el('label','bmetalbl');
+  lab.appendChild(el('span','eyebrow','meta: guardar'));
+  const box = el('span','moneybox small'); box.appendChild(el('span','cur','R$'));
+  const inp = document.createElement('input'); inp.type='number'; inp.step='100'; inp.min='0'; inp.placeholder='0';
+  if(BUDGET.meta != null) inp.value = BUDGET.meta;
+  inp.onchange = ()=>{ const v = parseFloat(inp.value); BUDGET.meta = isNaN(v) ? null : Math.max(0,v); saveBudget(); renderBudget(); };
+  box.appendChild(inp); lab.appendChild(box); mb.appendChild(lab);
+  const sv = el('div','v', reais(sobra)); sv.style.color = sobra<0 ? 'var(--crit)' : 'var(--pos)';
+  mb.appendChild(sv);
+  if(BUDGET.meta){
+    const mini = el('div','mini'); const f = el('div'); f.style.width = Math.max(0,Math.min(100, sobra/BUDGET.meta*100))+'%'; mini.appendChild(f); mb.appendChild(mini);
   }
-  return PLAN.cats[cat] != null ? PLAN.cats[cat] : Math.round(avg[cat] || 0);
-}
+  mb.appendChild(el('div','d', (live ? 'previsto para sobrar' : 'sobrou') + ' · entrou ' + reais(t.receita) + (live && sug.receita > t.receita ? ' (esperado '+reais(sug.receita)+')' : '') + (BUDGET.meta ? (sobra >= BUDGET.meta ? ' · meta batida' : ' · faltam '+reais(BUDGET.meta - sobra)) : '')));
+  mt.appendChild(mb);
 
-function renderPlan(){
-  const ms = months().slice().sort();
-  if(!ms.length) return;
-  const {avg, sub: subAvg, n, usados} = avgByCat();
-
-  // meses candidatos: o seguinte ao último com dado, e mais dois
-  const opts = [];
-  let m = nextMonth(ms[ms.length-1]);
-  for(let i=0;i<3;i++){ opts.push(m); m = nextMonth(m); }
-  if(!PLAN || !PLAN.month || !opts.includes(PLAN.month)){
-    PLAN = PLAN && PLAN.month && PLAN.cats ? PLAN : {month:opts[0], receita:null, invest:null, cats:{}, subs:{}};
-    if(!opts.includes(PLAN.month)) opts.unshift(PLAN.month);
-  }
-  const selM = $('#planMonth');
-  selM.innerHTML='';
-  opts.forEach(o=> selM.appendChild(new Option(monthLabel(o), o)));
-  selM.value = PLAN.month;
-  selM.onchange = ()=>{ PLAN.month = selM.value; savePlan(); renderPlan(); };
-  $('#planMonthName').textContent = monthLabel(PLAN.month);
-
-  const spendCats = Object.keys(CATS).filter(c=>!EXPENSE_EXCLUDE.includes(c));
-  const rec = PLAN.receita != null ? PLAN.receita : Math.round(avg['Receita']||0);
-  const inv = PLAN.invest  != null ? PLAN.invest  : Math.round(avg['Investimento']||0);
-  $('#planReceita').value = rec;
-  $('#planInvest').value = inv;
-  $('#hintReceita').textContent = 'média: ' + brl(avg['Receita']||0);
-  $('#hintInvest').textContent  = 'média: ' + brl(avg['Investimento']||0);
-
-  const box = $('#planCats'); box.innerHTML='';
-  PLAN.subs = PLAN.subs || {};
-  // planos salvos antes tinham só {sub: valor}; agora carregam o modo junto
-  for(const c in PLAN.subs){ if(!PLAN.subs[c].mode) PLAN.subs[c] = {mode:'sub', vals:PLAN.subs[c]}; }
-  let totalPlan = 0, totalAvg = 0;
-  const maxRef = Math.max(1, ...spendCats.map(c=> Math.max(avg[c]||0, planCatValue(c, avg, subAvg))));
-
-  spendCats.forEach(c=>{
-    const a = avg[c] || 0;
-    const mode = planMode(c);
-    const porSub = mode !== 'total';
-    const v = planCatValue(c, avg, subAvg);
-    totalPlan += v; totalAvg += a;
-
-    const wrap = el('div','plangroup'+(openCats.has('plan:'+c)?' open':''));
-    const row = el('div','planrow');
-
-    const nm = el('div','planname');
-    const head = el('span','planhead-name');
-    head.setAttribute('role','button'); head.tabIndex = 0;
-    head.appendChild(el('span','caret','▶'));
-    head.appendChild(el('span',null,c));
-    const toggle = ()=>{
-      openCats.has('plan:'+c) ? openCats.delete('plan:'+c) : openCats.add('plan:'+c);
-      wrap.classList.toggle('open');
-    };
-    head.onclick = toggle;
-    head.onkeydown = e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggle(); } };
-    nm.appendChild(head);
-    nm.appendChild(el('span','plansub','média ' + brl(a) +
-      (mode==='sub' ? ' · somando as subcategorias' : mode==='merchant' ? ' · somando os lançamentos' : '')));
-    row.appendChild(nm);
-
-    if(porSub){
-      const fixedVal = el('span','plansum', brl(v));
-      row.appendChild(fixedVal);
-    } else {
-      const money = el('span','moneybox');
-      money.appendChild(el('span','cur','R$'));
-      const inp = document.createElement('input');
-      inp.type='number'; inp.step='10'; inp.min='0'; inp.value = Math.round(v);
-      inp.setAttribute('aria-label','Orçamento de '+c+' para '+monthLabel(PLAN.month));
-      inp.oninput = ()=>{ PLAN.cats[c] = Math.max(0, parseFloat(inp.value)||0); savePlan(); renderPlan(); };
-      money.appendChild(inp);
-      row.appendChild(money);
-    }
-
-    const bar = el('div','planbar');
-    const av = el('div','avg'); av.style.width = Math.min(100, a/maxRef*100)+'%';
-    const st = el('div','set'); st.style.width = Math.min(100, v/maxRef*100)+'%';
-    bar.append(av, st); row.appendChild(bar);
-
-    const d = v - a;
-    row.appendChild(el('span','plandiff'+(Math.abs(d)<1 ? '' : d<0?' less':' more'),
-      Math.abs(d) < 1 ? 'na média' : (d>0?'+':'') + brl(d)));
-    wrap.appendChild(row);
-
-    // detalhe: subcategorias ou lançamento a lançamento
-    const det = el('div','plansubs');
-    const modes = el('div','planmodes');
-    modes.appendChild(el('span','eyebrow','planejar por'));
-    [['total','total'],['sub','subcategoria'],['merchant','lançamento']].forEach(([id,lbl])=>{
-      const mb = el('button','modebtn', lbl);
-      mb.setAttribute('aria-pressed', String(mode===id));
-      mb.onclick = ()=>{
-        if(id === 'total'){ delete PLAN.subs[c]; }
-        else {
-          const its = planItems(c, id, subAvg);
-          const seed = {};
-          if(id === 'merchant'){
-            its.forEach(it=> seed[it.key] = Math.round(it.ref));      // parte da última fatura
-          } else {
-            // distribui o que já estava planejado na proporção das médias
-            const soma = its.reduce((s,it)=> s + Math.max(0, it.ref), 0);
-            its.forEach(it=> seed[it.key] = soma > 0 ? Math.round(v * Math.max(0,it.ref) / soma) : 0);
-          }
-          PLAN.subs[c] = {mode:id, vals:seed};
-        }
-        openCats.add('plan:'+c);
-        savePlan(); renderPlan();
-      };
-      modes.appendChild(mb);
-    });
-    det.appendChild(modes);
-
-    const listaModo = mode === 'total' ? 'sub' : mode;
-    const its = planItems(c, listaModo, subAvg);
-    const vals = planVals(c);
-    if(mode === 'merchant' && !its.length){
-      det.appendChild(el('div','empty','Nenhum lançamento desta categoria nos últimos meses fechados.'));
-    }
-    if(mode === 'merchant'){
-      const meses = Array.from(new Set(its.map(i=>i.refMonth))).sort();
-      det.appendChild(el('div','planhint',
-        'referência: o valor mais recente de cada lançamento (' + meses.map(monthLabel).join(', ') + ')'));
-    }
-
-    const smax = Math.max(1, ...its.map(it=> Math.max(it.ref||0, porSub ? (vals[it.key]||0) : 0)));
-    its.forEach(it=>{
-      const sa = it.ref || 0;
-      const sv = porSub ? (vals[it.key] != null ? vals[it.key] : Math.round(sa)) : null;
-      const sr = el('div','plansubrow');
-      const snm = el('div','planname');
-      snm.appendChild(el('span','subttl', mode==='merchant' ? pretty(it.key) : it.key));
-      if(porSub) snm.appendChild(el('span','plansub',
-        (mode==='merchant' ? 'em ' + monthLabel(it.refMonth) + ': ' : 'média ') + brl(sa)));
-      sr.appendChild(snm);
-
-      if(porSub){
-        const money = el('span','moneybox small');
-        money.appendChild(el('span','cur','R$'));
-        const si = document.createElement('input');
-        si.type='number'; si.step='10'; si.min='0'; si.value = Math.round(sv);
-        si.setAttribute('aria-label','Orçamento de '+c+' · '+it.key);
-        si.oninput = ()=>{
-          PLAN.subs[c].vals[it.key] = Math.max(0, parseFloat(si.value)||0); savePlan(); renderPlan();
-        };
-        money.appendChild(si);
-        sr.appendChild(money);
-      } else {
-        sr.appendChild(el('span','plansum quiet', brl(sa)));
-      }
-
-      const sbar = el('div','planbar small');
-      const sav = el('div','avg'); sav.style.width = Math.min(100, sa/smax*100)+'%';
-      sbar.appendChild(sav);
-      if(porSub){ const sst = el('div','set'); sst.style.width = Math.min(100, sv/smax*100)+'%'; sbar.appendChild(sst); }
-      sr.appendChild(sbar);
-
-      if(porSub){
-        const sd = sv - sa;
-        const cut = el('button','cutbtn', sv > 0 ? 'cortar' : 'repor');
-        cut.title = sv > 0 ? 'zerar este item no plano' : 'voltar ao valor de referência';
-        cut.onclick = ()=>{
-          PLAN.subs[c].vals[it.key] = sv > 0 ? 0 : Math.round(sa); savePlan(); renderPlan();
-        };
-        sr.appendChild(cut);
-        sr.appendChild(el('span','plandiff'+(Math.abs(sd)<1 ? '' : sd<0?' less':' more'),
-          Math.abs(sd) < 1 ? '=' : (sd>0?'+':'') + brl(sd)));
-      } else {
-        sr.appendChild(el('span','plandiff',''));
-      }
-      det.appendChild(sr);
-    });
-    wrap.appendChild(det);
-    box.appendChild(wrap);
+  // alertas — no mês passado só interessa o que estourou
+  const al = $('#bAlerts'); al.innerHTML='';
+  rows.filter(x=> x.st==='over' || (live && x.st==='warn')).slice(0,3).forEach(x=>{
+    const over = x.st==='over';
+    const a = el('div','balert'+(over?' over':''));
+    a.appendChild(icoEl('alerta', over ? 'var(--crit)' : 'var(--warn)', 18));
+    const b = el('div');
+    b.append(el('div','it', over ? x.cat+' estourou' : x.cat+' em '+Math.round(x.r*100)+'%'),
+      el('div','id', over ? reais(x.spent-x.limit)+' acima do limite de '+reais(x.limit)+'.'
+        : 'Faltam '+left+' dias e sobram '+reais(x.limit-x.spent)+' — uns '+reais((x.limit-x.spent)/left)+' por dia.'));
+    a.appendChild(b); al.appendChild(a);
   });
 
-  const tot = el('div','plantotal');
-  const tn = el('div','planname');
-  tn.appendChild(el('span',null,'Total planejado'));
-  tn.appendChild(el('span','plansub','média dos gastos: ' + brl(totalAvg)));
-  tot.appendChild(tn);
-  tot.appendChild(el('span','cat-val', brl(totalPlan)));
-  const dt = totalPlan - totalAvg;
-  tot.appendChild(el('span','plandiff'+(Math.abs(dt)<1 ? '' : dt<0?' less':' more'),
-    Math.abs(dt)<1 ? 'na média' : (dt>0?'+':'') + brl(dt)));
-  box.appendChild(tot);
-
-  const sobra = rec - totalPlan - inv;
-  const lf = $('#planLeft');
-  lf.textContent = brl(sobra);
-  lf.classList.toggle('neg', sobra < 0);
-  $('#planWhy').textContent = brl(rec) + ' de receita − ' + brl(totalPlan) + ' de gastos − ' + brl(inv) + ' investidos';
-  const note = $('#planPanel').querySelector('.phead .note');
-  note.textContent = n ? 'médias de ' + n + (n>1?' meses':' mês') + ': ' + usados.map(monthLabel).join(', ') : '';
+  // linhas por categoria
+  const listBox = $('#budget'); listBox.innerHTML='';
+  const STATUS = {over:['Estourou','over'], warn:['Atenção','warn'], ok:['No ritmo','ok'], paid:['Fixo · pago','paid']};
+  rows.forEach(x=>{
+    const meta = catMeta(x.cat);
+    const row = el('div','brow');
+    const nm = el('div','bname');
+    nm.appendChild(icoEl(meta.i, meta.c, 20));
+    const nt = el('div'); nt.style.minWidth='0';
+    nt.append(el('div','bn', x.cat), el('div','bk', x.fixo ? 'gasto fixo' : 'gasto variável'));
+    nm.appendChild(nt);
+    const mid = el('div','bmid');
+    const tr = el('div','btrack'); const f = el('div');
+    f.style.width = Math.min(100, x.r*100)+'%'; f.style.background = x.st==='over' ? 'var(--crit)' : meta.c;
+    tr.appendChild(f);
+    if(live){ const mk = el('div','bmark'); mk.style.left = (pace*100)+'%'; tr.appendChild(mk); }
+    const rest = x.limit - x.spent;
+    const info = el('div','binfo');
+    const lt = el('span','bleft'+(rest<0?' neg':''), rest>=0 ? 'sobram '+reais(rest) : reais(-rest)+' acima do limite');
+    info.append(lt, el('span','bpct', Math.round(x.r*100)+'%'));
+    mid.append(tr, info);
+    const right = el('div','bval');
+    right.append(el('span','bs', reais(x.spent)), el('span','bde','de'));
+    const mbx = el('label','moneybox small');
+    mbx.appendChild(el('span','cur','R$'));
+    const li = document.createElement('input'); li.type='number'; li.step='50'; li.min='0'; li.value = Math.round(x.limit);
+    li.setAttribute('aria-label','Limite de '+x.cat);
+    if(x.custom) li.title = 'você mudou este limite — a sugestão é '+reais(sug.limits[x.cat]||0);
+    li.onchange = ()=>{ const v = parseFloat(li.value); if(isNaN(v)) delete BUDGET.limits[x.cat]; else BUDGET.limits[x.cat] = Math.max(0,v); saveBudget(); renderBudget(); };
+    mbx.appendChild(li);
+    const [lbl, cls] = STATUS[x.st];
+    right.append(mbx, el('span','bpill '+cls, lbl));
+    row.append(nm, mid, right);
+    listBox.appendChild(row);
+  });
+  if(unset > 0){
+    const n = list.filter(t=>effective(t).cat===UNSET && t.amount>0).length;
+    const u = el('div','bunset');
+    const ic = el('span','ico dashed'); ic.innerHTML = svgIcon('duvida', 20);
+    const tx = el('div'); tx.style.flex='1 1 240px';
+    tx.append(el('div','bn', 'A classificar · '+brl(unset)), el('div','bk', n+' lançamento'+(n>1?'s':'')+' sem categoria contam no total, mas em nenhum limite.'));
+    const go = el('button','btn ghost tiny','classificar agora');
+    go.onclick = ()=>{ catFilter = UNSET; $('#catFilter').value = UNSET; renderTable(txOfMonth(curMonth));
+      const tb = document.querySelector('[data-collapse="tabela"]'); if(tb) tb.classList.remove('collapsed');
+      document.querySelector('#rows').scrollIntoView({behavior:'smooth', block:'center'}); };
+    u.append(ic, tx, go);
+    listBox.appendChild(u);
+  }
+  if(!rows.length && !unset) listBox.appendChild(el('div','empty','Sem gastos nem limites para este mês ainda.'));
 }
-
-function savePlan(){ if(!DEMO) LS.set(K.plan, PLAN); }
 
 function renderFixed(){
   const list = $('#fixedList'); list.innerHTML='';
@@ -2415,13 +2492,13 @@ function renderAlerts(list){
     a.innerHTML = `<span><b>Mês incompleto.</b> A última fatura importada vai até ${monthLabel(cov)}, então aqui só aparece o que já foi debitado — conta, Flash, Pix. As compras no crédito de ${monthLabel(curMonth)} entram na próxima fatura.</span>`;
     box.appendChild(a);
   }
-  const unset = list.filter(t=>{ const e=effective(t); return e.cat==='Não planejado' && e.sub==='A classificar'; });
+  const unset = list.filter(t=>{ const e=effective(t); return e.cat===UNSET; });
   if(unset.length){
     const a = el('div','alert warn');
     const total = unset.reduce((s,t)=>s+t.amount,0);
     a.innerHTML = `<span><b>${unset.length}</b> lançamento${unset.length>1?'s':''} sem categoria — ${brl(total)}. Classifique na tabela e vira regra.</span>`;
     const btn = el('button','btn ghost tiny aact','ver');
-    btn.onclick = ()=>{ catFilter='Não planejado|A classificar'; $('#catFilter').value=catFilter; renderTable(txOfMonth(curMonth)); document.querySelector('#rows').scrollIntoView({behavior:'smooth',block:'center'}); };
+    btn.onclick = ()=>{ catFilter=UNSET; $('#catFilter').value=catFilter; renderTable(txOfMonth(curMonth)); document.querySelector('#rows').scrollIntoView({behavior:'smooth',block:'center'}); };
     a.appendChild(btn); box.appendChild(a);
   }
   const dupes = findDupes(list);
@@ -2457,7 +2534,7 @@ function renderTable(list){
       const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o);
     });
     const o=document.createElement('option');
-    o.value='Não planejado|A classificar'; o.textContent='— só o que falta classificar';
+    o.value=UNSET; o.textContent='— só o que falta classificar';
     sel.appendChild(o);
   }
   let rows = list.slice();
@@ -2489,7 +2566,7 @@ function renderTable(list){
     ds.appendChild(el('span','raw', t.raw + (t.parcela && t.parcela!=='Única' ? ' · '+t.parcela : '')));
     if(isShifted(t)) m.appendChild(el('span','shift','conta de '+monthLabel(mOf(t))));
     const ct = document.createElement('td');
-    const chip = el('button','chip'+(e.sub==='A classificar'?' unset':''));
+    const chip = el('button','chip'+(e.cat===UNSET?' unset':''));
     chip.appendChild(el('span','dot'));
     chip.appendChild(el('span',null,e.cat));
     if(e.sub) chip.appendChild(el('span','sublbl','· '+e.sub));
@@ -2675,36 +2752,18 @@ function buildWorkbook(){
     XLSX.utils.book_append_sheet(wb, wsS, 'Assinaturas');
   }
 
-  if(PLAN && PLAN.month){
-    const {avg, sub: subAvg} = avgByCat();
-    const linhas = [];
-    let tot = 0;
-    Object.keys(CATS).filter(c=>!EXPENSE_EXCLUDE.includes(c)).forEach(c=>{
-      const v = planCatValue(c, avg, subAvg);
-      tot += v;
-      linhas.push({Categoria:c, Subcategoria:'(total)', Referência:Number((avg[c]||0).toFixed(2)), Base:'média dos meses', Planejado:Number(v.toFixed(2))});
-      const mode = planMode(c);
-      if(mode !== 'total'){
-        const vals = planVals(c);
-        planItems(c, mode, subAvg).forEach(it=>{
-          const sv = vals[it.key] != null ? vals[it.key] : Math.round(it.ref);
-          linhas.push({Categoria:c, Subcategoria:(mode==='merchant'?'· ':'')+it.key,
-                       Referência:Number((it.ref||0).toFixed(2)),
-                       Base: mode==='merchant' ? monthLabel(it.refMonth) : 'média dos meses',
-                       Planejado:Number(sv.toFixed(2))});
-        });
-      }
-    });
-    const rec = PLAN.receita != null ? PLAN.receita : Math.round(avg['Receita']||0);
-    const inv = PLAN.invest  != null ? PLAN.invest  : Math.round(avg['Investimento']||0);
-    linhas.push({});
-    linhas.push({Categoria:'Receita esperada', Subcategoria:'', Referência:Number((avg['Receita']||0).toFixed(2)), Base:'média dos meses', Planejado:rec});
-    linhas.push({Categoria:'Investimento', Subcategoria:'', Referência:Number((avg['Investimento']||0).toFixed(2)), Base:'média dos meses', Planejado:inv});
-    linhas.push({Categoria:'Total de gastos', Subcategoria:'', Referência:'', Base:'', Planejado:Number(tot.toFixed(2))});
-    linhas.push({Categoria:'Sobra prevista', Subcategoria:'', Referência:'', Base:'', Planejado:Number((rec-tot-inv).toFixed(2))});
-    const wsP = XLSX.utils.json_to_sheet(linhas);
-    wsP['!cols'] = [{wch:20},{wch:26},{wch:13},{wch:18},{wch:13}];
-    XLSX.utils.book_append_sheet(wb, wsP, 'Plano ' + monthLabel(PLAN.month).replace('/','-'));
+  if(curMonth && curMonth!=='ALL'){
+    const sug = suggestedLimits(curMonth);
+    const gasto = new Map(spendCats(txOfMonth(curMonth)).map(c=>[c.cat,c.total]));
+    const lim = Object.assign({}, sug.limits, (BUDGET && BUDGET.limits) || {});
+    const linhas = Object.keys(lim).sort().map(c=>({Categoria:c, Limite:Number(lim[c].toFixed(2)),
+      Sugestão:Number((sug.limits[c]||0).toFixed(2)), Gasto:Number((gasto.get(c)||0).toFixed(2)),
+      Sobra:Number((lim[c]-(gasto.get(c)||0)).toFixed(2))}));
+    if(linhas.length){
+      const wsO = XLSX.utils.json_to_sheet(linhas);
+      wsO['!cols'] = [{wch:20},{wch:11},{wch:11},{wch:11},{wch:11}];
+      XLSX.utils.book_append_sheet(wb, wsO, 'Orçamento ' + monthLabel(curMonth).replace('/','-'));
+    }
   }
 
   const regras = Object.entries(RULES_USER).map(([m,r])=>({Estabelecimento:m, Categoria:r.cat, Subcategoria:r.sub}));
@@ -2726,7 +2785,7 @@ $('#expJson').onclick = ()=>{
   const hoje = new Date().toISOString().slice(0,10);
   saveFile('backup-onde-foi-o-dinheiro-'+hoje+'.json', JSON.stringify({
     v:2, exportado:new Date().toISOString(),
-    tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED
+    tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED, budget:BUDGET
   }));
 };
 /* junta um backup (ou o que está na nuvem) com o que já está aqui; devolve quantos lançamentos são novos */
@@ -2744,7 +2803,7 @@ function mergeBackup(b){
   if(Array.isArray(b.files)) b.files.forEach(x=>{ if(!FILES.some(y=>y.name===x.name)) FILES.push(x); });
   if(Array.isArray(b.dismiss)) b.dismiss.forEach(x=>{ if(!DISMISSED.includes(x)) DISMISSED.push(x); });
   if(b.fixed) FIXED = Object.assign(FIXED||{}, b.fixed);
-  if(b.plan && !PLAN){ PLAN = b.plan; LS.set(K.plan, PLAN); }
+  if(b.budget && !BUDGET){ BUDGET = b.budget; LS.set(K.budget, BUDGET); }
   if(b.avg && !avgMonths){ avgMonths = new Set(b.avg); LS.set(K.avg, b.avg); }
   LS.set(K.fixed, FIXED);
   TX.sort((a,b2)=> a.date<b2.date?1:a.date>b2.date?-1:0);
@@ -2786,7 +2845,7 @@ $('#wipe').onclick = ()=>{
   DEMO=false; TX=[]; RULES_USER={}; OVERRIDE={}; CATS=JSON.parse(JSON.stringify(DEFAULT_CATS)); FILES=[]; DISMISSED=[];
   avgMonths=null; LS.del(K.avg);
   FIXED=null; LS.del(K.fixed); LS.del(K.fixedSeed);
-  PLAN=null; LS.del(K.plan);
+  BUDGET=null; LS.del(K.budget);
   save(); renderFiles(); setStatus(''); $('#import').classList.remove('hidden'); render();
 };
 
@@ -2815,14 +2874,7 @@ document.querySelectorAll('th[data-sort]').forEach(th=>{
 });
 window.addEventListener('keydown', e=>{ if(e.key==='Escape') closePop(); });
 
-$('#planReceita').oninput = e => { PLAN.receita = Math.max(0, parseFloat(e.target.value)||0); savePlan(); renderPlan(); };
-$('#planInvest').oninput  = e => { PLAN.invest  = Math.max(0, parseFloat(e.target.value)||0); savePlan(); renderPlan(); };
-$('#planFromAvg').onclick = ()=>{ PLAN.cats = {}; PLAN.subs = {}; PLAN.receita = null; PLAN.invest = null; savePlan(); renderPlan(); };
-$('#planZero').onclick = ()=>{
-  const z = {};
-  Object.keys(CATS).filter(c=>!EXPENSE_EXCLUDE.includes(c)).forEach(c=> z[c] = 0);
-  PLAN.cats = z; PLAN.subs = {}; PLAN.invest = 0; savePlan(); renderPlan();
-};
+$('#bReset').onclick = ()=>{ if(BUDGET){ BUDGET.limits = {}; saveBudget(); } renderBudget(); };
 
 /* painéis recolhíveis — o estado fica salvo */
 (function(){
@@ -2854,7 +2906,7 @@ $('#planZero').onclick = ()=>{
    tabela (veja supabase.sql). Vazios, o app continua só local, como antes. */
 var SUPA_URL = 'https://wicijaskeaiplfucifta.supabase.co';
 var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpY2lqYXNrZWFpcGxmdWNpZnRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE4NzgsImV4cCI6MjEwNzIxNzg3OH0.RDu947wTaCqh8dGApLy1m3C3tH8j3lme4GGiYY8lD8M';
-var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','plan'];
+var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','budget'];
 var CLOUD_DIRTY = 'c6.cloud.dirty', CLOUD_AT = 'c6.cloud.at';
 var supa = null, cloudUser = null, cloudState = 'off', cloudMsg = '', pushTimer = null, applying = false, syncing = false;
 
@@ -2878,7 +2930,7 @@ function applyState(s){
   DEMO = false;
   TX = LS.get(K.tx, []); RULES_USER = LS.get(K.rules, {}); OVERRIDE = LS.get(K.over, {});
   CATS = LS.get(K.cats, DEFAULT_CATS); FILES = LS.get(K.files, []); DISMISSED = LS.get(K.dismiss, []);
-  FIXED = LS.get(K.fixed, null); PLAN = LS.get(K.plan, null);
+  FIXED = LS.get(K.fixed, null); BUDGET = LS.get(K.budget, null);
   const av = LS.get(K.avg, null); avgMonths = av ? new Set(av) : null;
   curMonth = null;
   renderFiles(); render();
