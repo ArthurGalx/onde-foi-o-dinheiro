@@ -1712,7 +1712,9 @@ function totals(list){
     else if(c==='Transferência') transf += t.amount;   // movimento entre contas, não é gasto
     else gasto += t.amount;
   }
-  return {gasto, receita, invest, transf, saldo: receita-gasto-invest};
+  // investir é guardar: o guardado é o que entrou menos o que gastou — a aplicação é parte
+  // dele, e o resgate (invest negativo) não é renda nova
+  return {gasto, receita, invest, transf, saldo: receita-gasto};
 }
 
 function byCategory(list){
@@ -1949,13 +1951,15 @@ function renderTiles(t, prev, prevM, list){
   const incTxt = inc ? Array.from(inc.subs).filter(s=>s[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([s,v])=>s+' '+reais(v)).join(' · ') : 'nenhuma entrada';
   tileOf('entrada', 'var(--pos-soft)', 'var(--pos)', 'entrou', brl(t.receita)).appendChild(el('div','d', incTxt));
 
-  const sb = tileOf('cofre', 'var(--invest-soft)', 'var(--invest)', 'sobrou', brl(t.saldo), t.saldo<0 ? 'var(--crit)' : 'var(--pos)');
+  const sb = tileOf('cofre', 'var(--invest-soft)', 'var(--invest)', t.saldo<0 ? 'gastou além do que entrou' : 'guardou', brl(t.saldo), t.saldo<0 ? 'var(--crit)' : 'var(--pos)');
+  // quanto do guardado foi para investimento — ou saiu dele, quando o mês teve resgate
+  const invTxt = t.invest>0.5 ? reais(t.invest)+' foi para investimentos' : t.invest<-0.5 ? reais(-t.invest)+' saiu dos investimentos' : 'nada investido';
   if(t.receita>0){
     const share = t.saldo/t.receita*100;
     const mini = el('div','mini'); const f = el('div'); f.style.width = Math.max(0,Math.min(100,share))+'%'; mini.appendChild(f);
     sb.appendChild(mini);
-    sb.appendChild(el('div','d', Math.round(share)+'% do que entrou' + (t.invest>0 ? ' · '+reais(t.invest)+' investido' : '')));
-  } else if(t.invest>0) sb.appendChild(el('div','d', reais(t.invest)+' investido'));
+    sb.appendChild(el('div','d', (t.saldo>=0 ? Math.round(share)+'% do que entrou' : 'saiu '+reais(-t.saldo)+' a mais do que entrou')+' · '+invTxt));
+  } else sb.appendChild(el('div','d', invTxt));
 
   let days;
   const dates = list.map(x=>x.date).sort();
@@ -2344,7 +2348,8 @@ function renderBudget(){
   const proj = live ? rows.reduce((s,x)=> s + (x.fixo ? Math.max(x.spent, x.limit) : x.spent/pace), 0) + unset/pace : spent;
   const t = totals(list);
   const receita = live ? Math.max(t.receita, sug.receita) : t.receita;
-  const sobra = receita - proj - t.invest;
+  // a meta é de guardar: o que for para investimento conta a favor
+  const sobra = receita - proj;
   const nomeMes = monthName(m);
 
   $('#bTitle').textContent = 'Orçamento de ' + nomeMes;
@@ -2416,7 +2421,7 @@ function renderBudget(){
   if(BUDGET.meta){
     const mini = el('div','mini'); const f = el('div'); f.style.width = Math.max(0,Math.min(100, sobra/BUDGET.meta*100))+'%'; mini.appendChild(f); mb.appendChild(mini);
   }
-  mb.appendChild(el('div','d', (live ? 'previsto para sobrar' : 'sobrou') + ' · entrou ' + reais(t.receita) + (live && sug.receita > t.receita ? ' (esperado '+reais(sug.receita)+')' : '') + (BUDGET.meta ? (sobra >= BUDGET.meta ? ' · meta batida' : ' · faltam '+reais(BUDGET.meta - sobra)) : '')));
+  mb.appendChild(el('div','d', (live ? 'previsto para guardar' : 'guardou') + ' · entrou ' + reais(t.receita) + (live && sug.receita > t.receita ? ' (esperado '+reais(sug.receita)+')' : '') + (BUDGET.meta ? (sobra >= BUDGET.meta ? ' · meta batida' : ' · faltam '+reais(BUDGET.meta - sobra)) : '')));
   mt.appendChild(mb);
 
   // alertas — no mês passado só interessa o que estourou
