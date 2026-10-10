@@ -532,6 +532,34 @@ body.has-data .top .sub{display:none}
 .arow{display:flex;gap:8px;align-items:center;margin-top:4px}
 .arow code{flex:1;min-width:0;font:12px var(--f-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;overflow-wrap:anywhere}
 
+/* investimentos */
+.invsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:22px}
+.invtile{background:var(--surface-2);border-radius:14px;padding:12px 14px}
+.invtile .v{font:600 20px var(--f-mono);letter-spacing:-.03em;margin-top:4px}
+.invtile.pos .v{color:var(--invest)}
+.invtile.neg .v{color:var(--warn)}
+.invtile .d{font-size:12px;color:var(--ink-3)}
+.ichart{display:flex;gap:10px;align-items:stretch}
+.icol{flex:1;min-width:0;display:flex;flex-direction:column;border:0;background:transparent;padding:0;cursor:pointer;opacity:.5;transition:opacity .15s}
+.icol:hover{opacity:.8}
+.icol.cur{opacity:1}
+.iup{height:var(--up);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;border-bottom:2px solid var(--line-strong)}
+.idn{height:var(--dn);display:flex;flex-direction:column;justify-content:flex-start;align-items:center;gap:4px}
+.ibar{width:100%;max-width:46px;border-radius:6px 6px 0 0}
+.ibar.ap{background:var(--invest)}
+.ibar.rs{background:var(--warn);border-radius:0 0 6px 6px}
+.ilbl{font:500 10.5px var(--f-mono);color:var(--ink-3);white-space:nowrap;padding:2px 0}
+.icol.cur .ilbl{color:var(--ink);font-weight:600}
+.invpanel .mnames{margin-top:8px}
+.invlist{display:flex;flex-direction:column;margin-top:14px}
+.invlist:empty{display:none}
+.invrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.invrow .ico{width:32px;height:32px;border-radius:9px}
+.invv{font:600 14px var(--f-mono);color:var(--invest)}
+.invv.neg{color:var(--warn)}
+.empty-inv .ichart,.empty-inv .mnames{display:none}
+@media(max-width:760px){.ilbl{font-size:9px}.ichart{gap:4px}}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -613,6 +641,14 @@ body.has-data .top .sub{display:none}
         <div class="mchart" id="monthly" role="img" aria-label="Gasto total por mês, por categoria"></div>
       </div>
     </section>
+
+      <section class="panel big invpanel">
+        <div class="phead"><div><h2>Investimentos mês a mês</h2><span class="note">aplicações acima da linha, resgates abaixo — clique num mês para abrir</span></div></div>
+        <div class="invsum" id="invSum"></div>
+        <div class="ichart" id="invChart" role="img" aria-label="Aplicações e resgates por mês"></div>
+        <div class="mnames" id="invNames"></div>
+        <div class="invlist" id="invList"></div>
+      </section>
 
       <section class="panel big">
         <div class="phead"><h2>Fique de olho</h2></div>
@@ -1766,6 +1802,7 @@ function render(){
   renderTiles(t, prev, prevM, list);
   renderCats(list, t, prevM);
   renderMonthly(ms);
+  renderInvest(ms);
   renderTop(list);
   renderMethods(list);
   renderInsights(list, prevM);
@@ -2069,6 +2106,74 @@ function renderMonthly(ms){
   box.after(names);
   const old = box.parentNode.querySelectorAll('.mnames');
   old.forEach(n=>{ if(n!==names) n.remove(); });
+}
+
+/* investimento: o que entrou em aplicação (valor positivo) e o que voltou de
+   resgate (negativo), por mês de competência. Não é gasto — fica à parte. */
+function investOf(m){
+  let ap = 0, rs = 0; const items = [];
+  for(const t of txOfMonth(m)){
+    const e = effective(t);
+    if(e.cat !== 'Investimento') continue;
+    if(t.amount > 0) ap += t.amount; else rs += -t.amount;
+    items.push(t);
+  }
+  return {ap, rs, net: ap - rs, items};
+}
+function renderInvest(ms){
+  const sum = $('#invSum'), chart = $('#invChart'), names = $('#invNames'), lst = $('#invList');
+  sum.innerHTML = ''; chart.innerHTML = ''; names.innerHTML = ''; lst.innerHTML = '';
+  const data = ms.slice(0,12).reverse().map(m=>({m, ...investOf(m)}));
+  const any = data.some(d=>d.ap || d.rs);
+  chart.closest('.invpanel').classList.toggle('empty-inv', !any);
+  if(!any){ sum.appendChild(el('p','fnote','Nenhuma aplicação ou resgate nos últimos 12 meses. Lançamentos na categoria Investimento aparecem aqui.')); return; }
+
+  // números de cima: o mês escolhido e o acumulado dos meses do gráfico
+  const tot = data.reduce((a,d)=>({ap:a.ap+d.ap, rs:a.rs+d.rs}), {ap:0, rs:0});
+  const cur = curMonth==='ALL' ? {ap:tot.ap, rs:tot.rs, net:tot.ap-tot.rs, items:[]} : investOf(curMonth);
+  const tile = (label, v, cls, d) => {
+    const c = el('div','invtile'+(cls?' '+cls:''));
+    c.append(el('div','eyebrow', label), el('div','v', brl(v)));
+    if(d) c.appendChild(el('div','d', d));
+    sum.appendChild(c);
+  };
+  tile(curMonth==='ALL' ? 'líquido no período' : 'líquido em '+monthName(curMonth), cur.net, cur.net<0 ? 'neg' : 'pos',
+    cur.ap || cur.rs ? 'aplicou '+reais(cur.ap)+(cur.rs ? ' · resgatou '+reais(cur.rs) : '') : 'nada neste mês');
+  tile('aplicado · '+data.length+' meses', tot.ap, '', 'média de '+reais(tot.ap/data.length)+' por mês');
+  tile('resgatado · '+data.length+' meses', tot.rs, '', '');
+  tile('líquido · '+data.length+' meses', tot.ap-tot.rs, (tot.ap-tot.rs)<0 ? 'neg' : 'pos', '');
+
+  // gráfico com linha no zero: a linha fica onde a proporção aplicações/resgates pede
+  const maxAp = Math.max(0, ...data.map(d=>d.ap)), maxRs = Math.max(0, ...data.map(d=>d.rs));
+  const H = 200, upH = maxAp+maxRs ? H*maxAp/(maxAp+maxRs) : H, dnH = H - upH;
+  const scale = (maxAp+maxRs) ? H/(maxAp+maxRs) : 0;
+  chart.style.setProperty('--up', upH+'px'); chart.style.setProperty('--dn', dnH+'px');
+  data.forEach(d=>{
+    const col = el('button','icol'+(d.m===curMonth?' cur':''));
+    col.type = 'button';
+    col.setAttribute('aria-label', monthLabel(d.m)+': aplicou '+brl(d.ap)+', resgatou '+brl(d.rs));
+    const up = el('div','iup'), dn = el('div','idn');
+    if(d.ap){ const b = el('div','ibar ap'); b.style.height = Math.max(2, d.ap*scale)+'px'; hoverTT(b, monthLabel(d.m)+' · aplicou '+brl(d.ap)); up.append(el('span','ilbl', reais(d.ap)), b); }
+    if(d.rs){ const b = el('div','ibar rs'); b.style.height = Math.max(2, d.rs*scale)+'px'; hoverTT(b, monthLabel(d.m)+' · resgatou '+brl(d.rs)); dn.append(b, el('span','ilbl', '−'+reais(d.rs))); }
+    col.append(up, dn);
+    col.onclick = ()=>{ curMonth = d.m; render(); };
+    chart.appendChild(col);
+    names.appendChild(el('span', d.m===curMonth ? 'cur' : null, monthLabel(d.m)));
+  });
+
+  // o que foi aplicado e resgatado no mês escolhido
+  if(cur.items.length){
+    cur.items.slice().sort((a,b)=> a.date<b.date?-1:1).forEach(t=>{
+      const e = effective(t);
+      const r = el('div','invrow');
+      r.appendChild(icoEl(t.amount>0 ? 'cofre' : 'entrada', t.amount>0 ? 'var(--invest)' : 'var(--warn)', 16));
+      const nm = el('div'); nm.style.flex='1'; nm.style.minWidth='0';
+      nm.append(el('div','bn', (t.amount>0 ? 'Aplicação' : 'Resgate')+(e.sub ? ' · '+e.sub : '')), el('div','bk', ptDate(t.date)+' · '+pretty(t.merchant)));
+      const v = el('div','invv'+(t.amount<0?' neg':''), (t.amount>0?'':'−')+brl(Math.abs(t.amount)));
+      r.append(nm, v);
+      lst.appendChild(r);
+    });
+  }
 }
 
 function renderTop(list){
