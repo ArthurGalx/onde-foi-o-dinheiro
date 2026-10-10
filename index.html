@@ -429,6 +429,23 @@ td.amt.neg{color:var(--pos)}
 .insights:empty{display:none}
 #alerts:empty{display:none}
 .insights + .alerts{margin-top:10px}
+
+/* sincronização */
+.topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
+.sync:empty{display:none}
+.syncform{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.syncform input{width:210px;min-height:38px}
+.syncform .btn,.syncpill{display:inline-flex;align-items:center;gap:7px;min-height:38px}
+.syncpill{border:1px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:500}
+.syncpill.ok{color:var(--pos);border-color:var(--pos-soft);background:var(--pos-soft)}
+.syncpill.saving{color:var(--ink-3)}
+.syncpill.err{color:var(--crit);border-color:var(--crit-soft);background:var(--crit-soft)}
+.syncout{border:0;background:transparent;color:var(--ink-3);font-size:12.5px;padding:8px 6px;min-height:38px}
+.syncout:hover{color:var(--ink)}
+.syncnote{flex-basis:100%;text-align:right;font-size:12.5px;color:var(--pos)}
+.syncnote.err{color:var(--crit)}
+@media(max-width:640px){.topside{align-items:stretch;width:100%}.sync,.syncform{justify-content:flex-start}.syncnote{text-align:left}.syncform input{flex:1;min-width:0}.acct{text-align:left}}
 </style>
 
 <div class="wrap">
@@ -437,7 +454,10 @@ td.amt.neg{color:var(--pos)}
       <h1><span class="logo" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8FE0AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M17 7.5c0-1.9-2.2-3-5-3s-5 1.2-5 3.2c0 4.6 10 2.6 10 7.4 0 2-2.2 3.4-5 3.4s-5-1.2-5-3.2"/></svg></span>Onde foi o dinheiro</h1>
       <p class="sub">Junta a fatura do cartão e o extrato da conta, tira a duplicidade do pagamento da fatura e mostra por categoria — pela data da compra.</p>
     </div>
-    <div class="acct" id="acct"></div>
+    <div class="topside">
+      <div class="sync" id="sync"></div>
+      <div class="acct" id="acct"></div>
+    </div>
   </header>
 
   <section class="import" id="import">
@@ -447,10 +467,11 @@ td.amt.neg{color:var(--pos)}
       <div class="row">
         <input type="password" id="pw" placeholder="senha" inputmode="numeric" autocomplete="off" aria-label="Senha dos arquivos">
         <button class="btn" id="pick">Escolher arquivos</button>
-        <input type="file" id="file" multiple accept=".xls,.xlsx,.csv" class="hidden">
+        <input type="file" id="file" multiple accept=".xls,.xlsx,.csv,.json" class="hidden">
+        <button class="btn ghost" id="impJson2">Restaurar backup (.json)</button>
         <button class="btn ghost" id="demoBtn">Ver com dados de exemplo</button>
       </div>
-      <p class="hint">A senha vale para os arquivos do C6 (os 6 primeiros dígitos do seu CPF); o CSV do Flash não precisa dela. Tudo é lido dentro do navegador — nenhum arquivo é enviado para lugar nenhum.</p>
+      <p class="hint">A senha vale para os arquivos do C6 (os 6 primeiros dígitos do seu CPF); o CSV do Flash não precisa dela. Os arquivos são lidos dentro do navegador — se você entrar com seu e-mail lá em cima, os lançamentos ficam guardados na sua conta e aparecem em qualquer aparelho.</p>
       <div class="status" id="status"></div>
       <div class="filelist" id="filelist"></div>
     </div>
@@ -637,7 +658,7 @@ td.amt.neg{color:var(--pos)}
         <button class="btn" id="expXlsx">Exportar planilha (.xlsx)</button>
         <button class="btn ghost" id="expJson">Backup (.json)</button>
         <button class="btn ghost" id="impJson">Restaurar backup</button>
-        <input type="file" id="restoreFile" accept=".json,application/json" class="hidden">
+        <input type="file" id="restoreFile" class="hidden">
         <button class="btn ghost" id="wipe">Apagar tudo</button>
       </div>
       <p class="fnote" id="dlNote" style="margin:14px 0 0"></p>
@@ -867,8 +888,8 @@ const INCOME_RULES = [
 /* ============================ util ============================ */
 const LS = {
   get(k, d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
-  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
-  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} cloudDirty(k); },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} cloudDirty(k); }
 };
 const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2' };
 
@@ -1276,7 +1297,11 @@ function setStatus(msg, kind){ const s=$('#status'); s.textContent=msg; s.classN
 
 async function handleFiles(list){
   const pw = $('#pw').value.trim();
-  const files = Array.from(list);
+  // backup .json solto junto com os arquivos do banco também vale
+  const all = Array.from(list);
+  const backups = all.filter(f=>/\.json$/i.test(f.name));
+  for(const f of backups) await restoreFromFile(f);
+  const files = all.filter(f=>!backups.includes(f));
   if(!files.length) return;
   if(DEMO){ DEMO=false; TX=LS.get(K.tx, []); curMonth=null; }
   let added=0, errs=[], report=[];
@@ -2704,35 +2729,49 @@ $('#expJson').onclick = ()=>{
     tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED
   }));
 };
-$('#impJson').onclick = ()=> $('#restoreFile').click();
-$('#restoreFile').onchange = async e => {
-  const f = e.target.files[0]; e.target.value='';
-  if(!f) return;
+/* junta um backup (ou o que está na nuvem) com o que já está aqui; devolve quantos lançamentos são novos */
+function mergeBackup(b){
+  if(DEMO){ DEMO=false; TX=LS.get(K.tx, []); curMonth=null; }
+  const have = new Set(TX.map(t=>t.id));
+  let n = 0;
+  for(const t of b.tx) if(!have.has(t.id)){ TX.push(t); have.add(t.id); n++; }
+  Object.assign(RULES_USER, b.rules||{});
+  Object.assign(OVERRIDE, b.over||{});
+  if(b.cats) for(const c in b.cats){
+    if(!CATS[c]) CATS[c] = b.cats[c].slice();
+    else b.cats[c].forEach(s=>{ if(!CATS[c].includes(s)) CATS[c].push(s); });
+  }
+  if(Array.isArray(b.files)) b.files.forEach(x=>{ if(!FILES.some(y=>y.name===x.name)) FILES.push(x); });
+  if(Array.isArray(b.dismiss)) b.dismiss.forEach(x=>{ if(!DISMISSED.includes(x)) DISMISSED.push(x); });
+  if(b.fixed) FIXED = Object.assign(FIXED||{}, b.fixed);
+  if(b.plan && !PLAN){ PLAN = b.plan; LS.set(K.plan, PLAN); }
+  if(b.avg && !avgMonths){ avgMonths = new Set(b.avg); LS.set(K.avg, b.avg); }
+  LS.set(K.fixed, FIXED);
+  TX.sort((a,b2)=> a.date<b2.date?1:a.date>b2.date?-1:0);
+  save();
+  return n;
+}
+async function restoreFromFile(f){
   try{
-    const b = JSON.parse(await f.text());
+    // o celular às vezes entrega o .json com outro nome ou tipo; o que vale é o conteúdo
+    const b = JSON.parse((await f.text()).replace(/^﻿/,''));
     if(!b || !Array.isArray(b.tx)) throw new Error('formato');
-    DEMO = false;
-    const have = new Set(TX.map(t=>t.id));
-    let n = 0;
-    for(const t of b.tx) if(!have.has(t.id)){ TX.push(t); have.add(t.id); n++; }
-    Object.assign(RULES_USER, b.rules||{});
-    Object.assign(OVERRIDE, b.over||{});
-    if(b.cats) for(const c in b.cats){
-      if(!CATS[c]) CATS[c] = b.cats[c].slice();
-      else b.cats[c].forEach(s=>{ if(!CATS[c].includes(s)) CATS[c].push(s); });
-    }
-    if(Array.isArray(b.files)) b.files.forEach(x=>{ if(!FILES.some(y=>y.name===x.name)) FILES.push(x); });
-    if(b.fixed) FIXED = Object.assign(FIXED||{}, b.fixed);
-    LS.set(K.fixed, FIXED);
-    TX.sort((a,b2)=> a.date<b2.date?1:a.date>b2.date?-1:0);
-    save(); renderFiles();
+    const n = mergeBackup(b);
+    renderFiles();
     $('#import').classList.remove('hidden');
     setStatus('Backup restaurado — '+n+' lançamento'+(n===1?'':'s')+' novo'+(n===1?'':'s')+'.', 'ok');
     render();
   }catch(err){
+    console.error(err);
     $('#import').classList.remove('hidden');
     setStatus('Não consegui ler esse backup — precisa ser o .json exportado aqui.', 'err');
   }
+}
+$('#impJson').onclick = ()=> $('#restoreFile').click();
+$('#impJson2').onclick = ()=> $('#restoreFile').click();
+$('#restoreFile').onchange = e => {
+  const f = e.target.files[0]; e.target.value='';
+  if(f) restoreFromFile(f);
 };
 let wipeArmed = false, wipeTimer = null;
 $('#wipe').onclick = ()=>{
@@ -2808,9 +2847,162 @@ $('#planZero').onclick = ()=>{
   });
 })();
 
+/* ============================ nuvem (Supabase) ============================
+   Com SUPA_URL e SUPA_KEY preenchidos, quem entra com o e-mail guarda tudo numa
+   linha da tabela "dados" — uma por pessoa — e qualquer aparelho logado vê o mesmo.
+   A chave "anon" é pública por natureza: quem protege os dados é a regra RLS da
+   tabela (veja supabase.sql). Vazios, o app continua só local, como antes. */
+var SUPA_URL = '';
+var SUPA_KEY = '';
+var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','plan'];
+var CLOUD_DIRTY = 'c6.cloud.dirty', CLOUD_AT = 'c6.cloud.at';
+var supa = null, cloudUser = null, cloudState = 'off', cloudMsg = '', pushTimer = null, applying = false, syncing = false;
+
+function cloudDirty(k){
+  if(!SYNC_KEYS || applying || DEMO_SAFE() || !SYNC_KEYS.some(s=>K[s]===k)) return;
+  try{ localStorage.setItem(CLOUD_DIRTY, '1'); }catch(e){}
+  if(!supa || !cloudUser) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(cloudPush, 1500);
+  setCloud('saving');
+}
+// DEMO é declarado com let mais acima; durante a carga inicial ainda pode não existir
+function DEMO_SAFE(){ try{ return DEMO; }catch(e){ return false; } }
+const isCloudDirty = () => { try{ return localStorage.getItem(CLOUD_DIRTY)==='1'; }catch(e){ return false; } };
+
+function snapshot(){ const s={}; SYNC_KEYS.forEach(k=>{ s[k]=LS.get(K[k], null); }); return s; }
+function applyState(s){
+  applying = true;
+  SYNC_KEYS.forEach(k=>{ s[k]==null ? LS.del(K[k]) : LS.set(K[k], s[k]); });
+  applying = false;
+  DEMO = false;
+  TX = LS.get(K.tx, []); RULES_USER = LS.get(K.rules, {}); OVERRIDE = LS.get(K.over, {});
+  CATS = LS.get(K.cats, DEFAULT_CATS); FILES = LS.get(K.files, []); DISMISSED = LS.get(K.dismiss, []);
+  FIXED = LS.get(K.fixed, null); PLAN = LS.get(K.plan, null);
+  const av = LS.get(K.avg, null); avgMonths = av ? new Set(av) : null;
+  curMonth = null;
+  renderFiles(); render();
+  if(TX.length) $('#import').classList.add('hidden');
+}
+function markSynced(at){
+  try{ localStorage.removeItem(CLOUD_DIRTY); localStorage.setItem(CLOUD_AT, at||''); }catch(e){}
+}
+
+async function cloudFetch(){
+  const { data, error } = await supa.from('dados').select('estado, atualizado').maybeSingle();
+  if(error) throw error;
+  return data;
+}
+async function cloudPush(){
+  if(!supa || !cloudUser || syncing) return;
+  syncing = true; setCloud('saving');
+  try{
+    // outro aparelho salvou depois da última vez que puxamos? junta antes de sobrescrever
+    const remote = await cloudFetch();
+    let lastAt = ''; try{ lastAt = localStorage.getItem(CLOUD_AT)||''; }catch(e){}
+    if(remote && remote.atualizado !== lastAt && remote.estado && Array.isArray(remote.estado.tx)){
+      applying = true; mergeBackup(remote.estado); applying = false;
+      renderFiles(); render();
+    }
+    const at = new Date().toISOString();
+    const { error } = await supa.from('dados').upsert({ user_id: cloudUser.id, estado: snapshot(), atualizado: at });
+    if(error) throw error;
+    markSynced(at);
+    setCloud('ok');
+  }catch(e){
+    console.error(e); applying = false;
+    setCloud('err', 'não consegui salvar na nuvem');
+  }finally{ syncing = false; }
+}
+async function cloudPull(){
+  if(!supa || !cloudUser || syncing) return;
+  syncing = true; setCloud('saving');
+  try{
+    const remote = await cloudFetch();
+    let lastAt = ''; try{ lastAt = localStorage.getItem(CLOUD_AT)||''; }catch(e){}
+    syncing = false;
+    if(!remote || !remote.estado || !Array.isArray(remote.estado.tx)){
+      // conta nova: o que já está neste aparelho vira o começo da nuvem
+      if(TX.length && !DEMO) await cloudPush(); else setCloud('ok');
+      return;
+    }
+    if(isCloudDirty()){
+      // mexeu aqui sem internet ou antes de entrar: junta as duas coisas e sobe
+      applying = true; mergeBackup(remote.estado); applying = false;
+      renderFiles(); render();
+      try{ localStorage.setItem(CLOUD_AT, remote.atualizado); }catch(e){}
+      await cloudPush();
+      return;
+    }
+    if(remote.atualizado !== lastAt) applyState(remote.estado);
+    markSynced(remote.atualizado);
+    setCloud('ok');
+  }catch(e){
+    console.error(e); syncing = false; applying = false;
+    setCloud('err', 'não consegui falar com a nuvem');
+  }
+}
+
+const CLOUD_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18z"/></svg>';
+function setCloud(state, msg){ cloudState = state; cloudMsg = msg||''; renderSync(); }
+function renderSync(){
+  const box = $('#sync'); if(!box) return;
+  box.innerHTML = '';
+  if(!supa) return;
+  if(!cloudUser){
+    const form = el('form','syncform');
+    const lbl = el('label','sr','Seu e-mail'); lbl.htmlFor = 'syncEmail';
+    const inp = el('input'); inp.type='email'; inp.id='syncEmail'; inp.required = true; inp.placeholder='seu e-mail'; inp.autocomplete='email';
+    const btn = el('button','btn tiny'); btn.type='submit'; btn.innerHTML = CLOUD_ICON + '<span>Entrar e sincronizar</span>';
+    form.append(lbl, inp, btn);
+    form.onsubmit = async e => {
+      e.preventDefault();
+      btn.disabled = true;
+      const { error } = await supa.auth.signInWithOtp({ email: inp.value.trim(), options: { emailRedirectTo: location.origin + location.pathname } });
+      btn.disabled = false;
+      box.querySelector('.syncnote')?.remove();
+      box.appendChild(el('div','syncnote'+(error?' err':''), error ? 'Não deu: '+error.message : 'Pronto! Abra o link que chegou no seu e-mail — neste aparelho.'));
+    };
+    box.appendChild(form);
+    if(cloudMsg) box.appendChild(el('div','syncnote', cloudMsg));
+    return;
+  }
+  const pill = el('button','syncpill '+cloudState);
+  pill.type = 'button';
+  const txt = cloudState==='saving' ? 'Salvando…' : cloudState==='err' ? (cloudMsg||'erro')+' — tentar de novo' : 'Sincronizado';
+  pill.innerHTML = CLOUD_ICON;
+  pill.appendChild(el('span', null, txt));
+  pill.title = cloudUser.email || '';
+  pill.onclick = ()=> isCloudDirty() ? cloudPush() : cloudPull();
+  const out = el('button','syncout','sair');
+  out.type = 'button';
+  out.onclick = async ()=>{ await supa.auth.signOut(); };
+  box.append(pill, out);
+}
+
+function loadScript(src){ return new Promise((ok, err)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=err; document.head.appendChild(s); }); }
+async function cloudInit(){
+  if(!SUPA_URL || !SUPA_KEY) return;
+  try{ await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'); }
+  catch(e){ return; }   // sem internet: segue local
+  supa = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true, detectSessionInUrl: true, flowType: 'implicit' } });
+  supa.auth.onAuthStateChange((ev, session)=>{
+    const u = session ? session.user : null;
+    const changed = (u && u.id) !== (cloudUser && cloudUser.id);
+    cloudUser = u;
+    if(u && changed){ setTimeout(cloudPull, 0); }
+    if(!u) setCloud('off');
+    else renderSync();
+  });
+  renderSync();
+  // voltou para a aba: pode ter mudado no outro aparelho
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && cloudUser && !isCloudDirty()) cloudPull(); });
+}
+
 renderFiles();
 render();
 if(TX.length) $('#import').classList.add('hidden');
+cloudInit();
 </script>
 
 </body></html>
