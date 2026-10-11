@@ -580,6 +580,11 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 .alogrow .ar{grid-column:2;color:var(--pos);font-weight:600}
 .alogrow.err .ar{color:var(--crit)}
 
+.bsum{margin-bottom:14px}
+@media(max-width:760px){.bsum,.invsum{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.invtile{padding:10px 12px}.invtile .v{font-size:17px}.invtile .d{font-size:11px}}
+.btotal{border-top:2px solid var(--line-strong);margin-top:6px}
+.btotal .bn{font-size:16px}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -683,6 +688,7 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
         <div><h2 id="bTitle">Orçamento do mês</h2><span class="note" id="bNote"></span></div>
         <button class="btn ghost tiny" id="bReset">voltar às sugestões</button>
       </div>
+      <div class="invsum bsum" id="bSum"></div>
       <div class="btop">
         <div class="hero bhero" id="bHero"></div>
         <div class="sidetiles">
@@ -2390,6 +2396,21 @@ function renderBudget(){
     : 'como o mês fechou contra os limites';
   $('#bRef').textContent = sug.ref.length ? 'limites sugeridos pela mediana de '+sug.ref.map(monthLabel).join(', ')+' — mude o que quiser' : 'defina os limites que quiser';
 
+  // totais do mês: o orçamento é a soma dos limites
+  const bs = $('#bSum'); bs.innerHTML = '';
+  const bt = (label, v, d, color) => {
+    const c = el('div','invtile');
+    const vv = el('div','v', reais(v)); if(color) vv.style.color = color;
+    c.append(el('div','eyebrow', label), vv);
+    if(d) c.appendChild(el('div','d', d));
+    bs.appendChild(c);
+  };
+  bt('orçamento do mês', plan, 'soma dos limites de '+rows.filter(x=>x.limit>0).length+' categorias');
+  bt(live ? 'gasto até agora' : 'gasto no mês', spent, plan>0 ? Math.round(spent/plan*100)+'% do orçamento' : '', spent>plan ? 'var(--crit)' : '');
+  if(live) bt('previsão de fechamento', proj, proj>plan ? reais(proj-plan)+' acima do orçamento' : reais(plan-proj)+' abaixo do orçamento', proj>plan ? 'var(--crit)' : 'var(--pos)');
+  bt(remaining>=0 ? (live ? 'ainda dá para gastar' : 'sobrou do orçamento') : 'passou do orçamento', Math.abs(remaining),
+     live && remaining>0 ? 'uns '+reais(remaining/left)+' por dia até o dia '+days : '', remaining<0 ? 'var(--crit)' : 'var(--pos)');
+
   // destaque
   const hero = $('#bHero'); hero.innerHTML='';
   const top = el('div','herotop');
@@ -2422,6 +2443,8 @@ function renderBudget(){
 
   // previsão
   const pj = $('#bProj'); pj.innerHTML='';
+  // no mês corrente a previsão já está nos totais lá em cima
+  pj.style.display = live ? 'none' : '';
   const diff = proj - plan;
   pj.appendChild(icoEl('subiu', diff>0 ? 'var(--crit-soft)' : 'var(--pos-soft)', 22, diff>0 ? 'var(--crit)' : 'var(--pos)'));
   const pb = el('div'); pb.style.flex='1'; pb.style.minWidth='0';
@@ -2519,6 +2542,23 @@ function renderBudget(){
     listBox.appendChild(u);
   }
   if(!rows.length && !unset) listBox.appendChild(el('div','empty','Sem gastos nem limites para este mês ainda.'));
+  else {
+    // linha de total, no mesmo desenho das categorias
+    const tot = el('div','brow btotal');
+    const tn = el('div','bname'); const tt = el('div'); tt.append(el('div','bn','Total'), el('div','bk', unset ? 'inclui '+reais(unset)+' a classificar' : 'todas as categorias'));
+    tn.appendChild(tt);
+    const tm = el('div','bmid');
+    const ttr = el('div','btrack'); const tf = el('div');
+    tf.style.width = Math.min(100, plan>0 ? spent/plan*100 : 0)+'%'; tf.style.background = spent>plan ? 'var(--crit)' : 'var(--ink)';
+    ttr.appendChild(tf);
+    if(live){ const mk = el('div','bmark'); mk.style.left = (pace*100)+'%'; ttr.appendChild(mk); }
+    const ti = el('div','binfo');
+    ti.append(el('span','bleft'+(remaining<0?' neg':''), remaining>=0 ? 'sobram '+reais(remaining) : reais(-remaining)+' acima do orçamento'), el('span','bpct', plan>0 ? Math.round(spent/plan*100)+'%' : ''));
+    tm.append(ttr, ti);
+    const tv = el('div','bval'); tv.append(el('span','bs', reais(spent)), el('span','bde','de'), el('span','bs', reais(plan)));
+    tot.append(tn, tm, tv);
+    listBox.appendChild(tot);
+  }
 }
 
 function renderFixed(){
