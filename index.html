@@ -2352,14 +2352,15 @@ function renderBudget(){
 
   const names = new Set([...Object.keys(sug.limits), ...Object.keys(BUDGET.limits), ...spentBy.keys()]);
   names.delete(UNSET);
-  const SEV = {over:0, warn:1, ok:2, paid:3};
+  const SEV = {over:0, warn:1, ok:2, paid:3, free:4};
   const rows = Array.from(names).map(cat=>{
     const custom = BUDGET.limits[cat] != null;
     const limit = custom ? BUDGET.limits[cat] : (sug.limits[cat]||0);
     const spent = spentBy.get(cat)||0;
     const fixo = FIXED_CATS.includes(cat);
     const r = limit>0 ? spent/limit : (spent>0 ? 2 : 0);
-    const st = fixo && r>=0.9 && r<=1.05 ? 'paid' : r>1 ? 'over' : r>=0.8 ? 'warn' : 'ok';
+    // sem histórico não há limite sugerido: não dá para "estourar" um limite que ninguém definiu
+    const st = limit<=0 ? 'free' : fixo && r>=0.9 && r<=1.05 ? 'paid' : r>1 ? 'over' : r>=0.8 ? 'warn' : 'ok';
     return {cat, limit, spent, fixo, r, st, custom};
   }).filter(x=>x.limit>0 || x.spent>0)
     .sort((a,b)=> SEV[a.st]-SEV[b.st] || b.spent-a.spent);
@@ -2367,8 +2368,15 @@ function renderBudget(){
   const plan = rows.reduce((s,x)=>s+x.limit, 0);
   const spent = rows.reduce((s,x)=>s+x.spent, 0) + unset;
   const remaining = plan - spent;
-  // fixo conta pelo limite (vai ser pago de qualquer jeito); o resto segue o ritmo do mês
-  const proj = live ? rows.reduce((s,x)=> s + (x.fixo ? Math.max(x.spent, x.limit) : x.spent/pace), 0) + unset/pace : spent;
+  /* Previsão: o que já foi + o que falta das contas fixas + o seu gasto variável típico
+     por dia (mediana dos meses de referência) nos dias que faltam. Multiplicar o gasto
+     até hoje pelo mês inteiro transformava uma compra grande do dia 4 em três. */
+  const dim = mm => { const [yy,mo] = mm.split('-').map(Number); return new Date(yy, mo, 0).getDate(); };
+  const daily = median(sug.ref.map(mm=> spendCats(txOfMonth(mm)).filter(c=>!FIXED_CATS.includes(c.cat)).reduce((a,c)=>a+c.total,0) / dim(mm)));
+  const fixedLeft = rows.filter(x=>x.fixo).reduce((a,x)=> a + Math.max(0, x.limit - x.spent), 0);
+  const proj = !live ? spent
+    : daily > 0 ? spent + fixedLeft + daily * (days - day)
+    : rows.reduce((a,x)=> a + (x.fixo ? Math.max(x.spent, x.limit) : x.spent/pace), 0) + unset/pace;
   const t = totals(list);
   const receita = live ? Math.max(t.receita, sug.receita) : t.receita;
   // a meta é de guardar: o que for para investimento conta a favor
@@ -2418,10 +2426,10 @@ function renderBudget(){
   pj.appendChild(icoEl('subiu', diff>0 ? 'var(--crit-soft)' : 'var(--pos-soft)', 22, diff>0 ? 'var(--crit)' : 'var(--pos)'));
   const pb = el('div'); pb.style.flex='1'; pb.style.minWidth='0';
   if(live){
-    pb.append(el('div','eyebrow','no ritmo atual você fecha em'), el('div','v', reais(proj)));
+    pb.append(el('div','eyebrow','previsão de fechamento'), el('div','v', reais(proj)));
   } else {
-    const dentro = rows.filter(x=>x.r<=1).length;
-    pb.append(el('div','eyebrow','categorias dentro do limite'), el('div','v', dentro+' de '+rows.length));
+    const dentro = rows.filter(x=>x.limit>0 && x.r<=1).length;
+    pb.append(el('div','eyebrow','categorias dentro do limite'), el('div','v', dentro+' de '+rows.filter(x=>x.limit>0).length));
   }
   const pd = el('div','d', Math.abs(diff)<1 ? 'exatamente no plano' : reais(Math.abs(diff))+(diff>0?' acima':' abaixo')+' do plano');
   pd.style.color = diff>0 ? 'var(--crit)' : 'var(--pos)'; pd.style.fontWeight='600';
@@ -2444,7 +2452,9 @@ function renderBudget(){
   if(BUDGET.meta){
     const mini = el('div','mini'); const f = el('div'); f.style.width = Math.max(0,Math.min(100, sobra/BUDGET.meta*100))+'%'; mini.appendChild(f); mb.appendChild(mini);
   }
-  mb.appendChild(el('div','d', (live ? 'previsto para guardar' : 'guardou') + ' · entrou ' + reais(t.receita) + (live && sug.receita > t.receita ? ' (esperado '+reais(sug.receita)+')' : '') + (BUDGET.meta ? (sobra >= BUDGET.meta ? ' · meta batida' : ' · faltam '+reais(BUDGET.meta - sobra)) : '')));
+  mb.appendChild(el('div','d', (live ? 'previsto para guardar: ' : 'guardou: ') + 'entrou ' + reais(receita) + (live && sug.receita > t.receita ? ' (esperado)' : '') + ' − gastos ' + (live ? 'previstos ' : '') + reais(proj) + (BUDGET.meta ? (sobra >= BUDGET.meta ? ' · meta batida' : ' · faltam '+reais(BUDGET.meta - sobra)) : '')));
+  // o que já foi para investimento é guardado de fato, mesmo antes do mês fechar
+  if(t.invest > 0.5){ const inv = el('div','d', reais(t.invest)+' já foram para investimentos'); inv.style.color = 'var(--invest)'; inv.style.fontWeight = '600'; mb.appendChild(inv); }
   mt.appendChild(mb);
 
   // alertas — no mês passado só interessa o que estourou
@@ -2456,13 +2466,13 @@ function renderBudget(){
     const b = el('div');
     b.append(el('div','it', over ? x.cat+' estourou' : x.cat+' em '+Math.round(x.r*100)+'%'),
       el('div','id', over ? reais(x.spent-x.limit)+' acima do limite de '+reais(x.limit)+'.'
-        : 'Faltam '+left+' dias e sobram '+reais(x.limit-x.spent)+' — uns '+reais((x.limit-x.spent)/left)+' por dia.'));
+        : 'Faltam '+left+' dias e sobram '+reais(x.limit-x.spent)+((x.limit-x.spent)/left >= 5 ? ' — uns '+reais((x.limit-x.spent)/left)+' por dia.' : ' — melhor segurar até o fim do mês.')));
     a.appendChild(b); al.appendChild(a);
   });
 
   // linhas por categoria
   const listBox = $('#budget'); listBox.innerHTML='';
-  const STATUS = {over:['Estourou','over'], warn:['Atenção','warn'], ok:['No ritmo','ok'], paid:['Fixo · pago','paid']};
+  const STATUS = {over:['Estourou','over'], warn:['Atenção','warn'], ok:['No ritmo','ok'], paid:['Fixo · pago','paid'], free:['Sem limite','paid']};
   rows.forEach(x=>{
     const meta = catMeta(x.cat);
     const row = el('div','brow');
@@ -2478,7 +2488,8 @@ function renderBudget(){
     if(live){ const mk = el('div','bmark'); mk.style.left = (pace*100)+'%'; tr.appendChild(mk); }
     const rest = x.limit - x.spent;
     const info = el('div','binfo');
-    const lt = el('span','bleft'+(rest<0?' neg':''), rest>=0 ? 'sobram '+reais(rest) : reais(-rest)+' acima do limite');
+    const lt = x.limit<=0 ? el('span','bleft','sem limite — coloque um ao lado se quiser')
+      : el('span','bleft'+(rest<0?' neg':''), rest>=0 ? 'sobram '+reais(rest) : reais(-rest)+' acima do limite');
     info.append(lt, el('span','bpct', Math.round(x.r*100)+'%'));
     mid.append(tr, info);
     const right = el('div','bval');
