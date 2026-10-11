@@ -573,6 +573,13 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 #gastoDlg[data-tipo="gasto"] .inv-only{display:none}
 .gfield select{min-height:44px}
 
+.alog{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.alogrow{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.alogrow .aq{font-family:var(--f-mono);color:var(--ink-3)}
+.alogrow .ad{font-family:var(--f-mono);overflow-wrap:anywhere}
+.alogrow .ar{grid-column:2;color:var(--pos);font-weight:600}
+.alogrow.err .ar{color:var(--crit)}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -3382,13 +3389,36 @@ async function openAtalho(){
       const r = await fetch(url, { method:'POST', headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY, 'Content-Type':'application/json' },
         body: JSON.stringify({ token:data.token, valor:'R$ 1,00', loja:'Teste do atalho', cartao:'teste' }) });
       if(!r.ok) throw new Error(await r.text());
+      const j = await r.json().catch(()=>({ok:true}));
+      if(j && j.ok === false) throw new Error(j.erro || 'erro');
       await pullInbox();
       tmsg.textContent = 'Chegou! Ele está nos lançamentos como provisório — pode apagar.';
+      drawLog();
     }catch(e){ tmsg.textContent = 'Não chegou: '+e.message; }
     test.disabled = false;
   };
   const tr = el('div','row'); tr.style.justifyContent = 'flex-start'; tr.append(test, tmsg);
   box.appendChild(tr);
+
+  // o que o iPhone mandou nas últimas vezes — é por aqui que se descobre por que um cartão falha
+  const logBox = el('div','alog');
+  box.appendChild(logBox);
+  async function drawLog(){
+    const { data: rows, error: le } = await supa.from('atalho_log').select('quando, valor, loja, cartao, ok, erro').order('id', {ascending:false}).limit(8);
+    logBox.innerHTML = '';
+    logBox.appendChild(el('div','eyebrow','últimas chamadas do atalho'));
+    if(le){ logBox.appendChild(el('p','fnote','O registro de chamadas precisa do arquivo supabase-atalho-v2.sql rodado no Supabase.')); return; }
+    if(!rows.length){ logBox.appendChild(el('p','fnote','Nenhuma chamada ainda. Se uma compra deu "a automação falhou" e não aparece aqui, o erro foi no iPhone, antes de enviar.')); return; }
+    rows.forEach(r=>{
+      const d = new Date(r.quando);
+      const row = el('div','alogrow'+(r.ok?'':' err'));
+      row.append(el('span','aq', String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')),
+        el('span','ad', [r.valor || '(sem valor)', r.loja || '(sem loja)', r.cartao || '(sem cartão)'].join(' · ')),
+        el('span','ar', r.ok ? 'ok' : (r.erro || 'erro')));
+      logBox.appendChild(row);
+    });
+  }
+  drawLog();
 }
 
 /* ============================ nuvem (Supabase) ============================
