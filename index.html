@@ -2317,6 +2317,29 @@ function renderInsights(list, prevM){
    No mês corrente mostra quanto dá para gastar por dia e como o mês fecha no ritmo
    atual; num mês passado, como ele fechou contra os limites. */
 function saveBudget(){ if(!DEMO) LS.set(K.budget, BUDGET); }
+/* Cada limite e a meta guardam a hora em que foram mudados. Com dois aparelhos, o que
+   tinha o orçamento antigo mandava a cópia inteira de volta e a mudança "voltava atrás";
+   agora, ao juntar, vence a mudança mais nova de cada categoria.
+   Limite null = "usar a sugestão" (é assim que "voltar às sugestões" sincroniza). */
+const nowIso = () => new Date().toISOString();
+function ensureBudget(){ BUDGET = BUDGET || {limits:{}, meta:null}; BUDGET.limits = BUDGET.limits || {}; BUDGET.at = BUDGET.at || {}; return BUDGET; }
+function setLimit(cat, v){ ensureBudget(); BUDGET.limits[cat] = v; BUDGET.at[cat] = nowIso(); saveBudget(); }
+function setMeta(v){ ensureBudget(); BUDGET.meta = v; BUDGET.metaAt = nowIso(); saveBudget(); }
+function mergeBudget(a, b){
+  if(!b) return a;
+  if(!a) return b;
+  const la = a.limits||{}, lb = b.limits||{}, ta = a.at||{}, tb = b.at||{};
+  const out = {limits:{}, at:{}, meta:a.meta ?? null, metaAt:a.metaAt||''};
+  new Set([...Object.keys(la), ...Object.keys(lb), ...Object.keys(ta), ...Object.keys(tb)]).forEach(k=>{
+    const xa = ta[k]||'', xb = tb[k]||'';
+    // sem hora dos dois lados (orçamento de antes desta correção): vale o lado que tem valor
+    const useB = xb > xa || (xb === xa && lb[k] !== undefined);
+    out.limits[k] = (useB ? lb[k] : la[k]) ?? null;
+    if(useB ? xb : xa) out.at[k] = useB ? xb : xa;
+  });
+  if((b.metaAt||'') > (a.metaAt||'') || (!a.metaAt && !b.metaAt && a.meta == null)){ out.meta = b.meta ?? null; out.metaAt = b.metaAt||''; }
+  return out;
+}
 const ymOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 function median(xs){
   const s = xs.slice().sort((a,b)=>a-b), n = s.length;
@@ -2342,8 +2365,7 @@ function renderBudget(){
   const sec = $('#budgetSec');
   if(curMonth==='ALL'){ sec.classList.add('hidden'); return; }
   sec.classList.remove('hidden');
-  BUDGET = BUDGET || {limits:{}, meta:null};
-  BUDGET.limits = BUDGET.limits || {};
+  ensureBudget();
   const m = curMonth;
   const [y,mm] = m.split('-').map(Number);
   const days = new Date(y, mm, 0).getDate();
@@ -2468,7 +2490,7 @@ function renderBudget(){
   const box = el('span','moneybox small'); box.appendChild(el('span','cur','R$'));
   const inp = document.createElement('input'); inp.type='number'; inp.step='100'; inp.min='0'; inp.placeholder='0';
   if(BUDGET.meta != null) inp.value = BUDGET.meta;
-  inp.onchange = ()=>{ const v = parseFloat(inp.value); BUDGET.meta = isNaN(v) ? null : Math.max(0,v); saveBudget(); renderBudget(); };
+  inp.onchange = ()=>{ const v = parseFloat(inp.value); setMeta(isNaN(v) ? null : Math.max(0,v)); renderBudget(); };
   box.appendChild(inp); lab.appendChild(box); mb.appendChild(lab);
   const sv = el('div','v', reais(sobra)); sv.style.color = sobra<0 ? 'var(--crit)' : 'var(--pos)';
   mb.appendChild(sv);
@@ -2522,7 +2544,7 @@ function renderBudget(){
     const li = document.createElement('input'); li.type='number'; li.step='50'; li.min='0'; li.value = Math.round(x.limit);
     li.setAttribute('aria-label','Limite de '+x.cat);
     if(x.custom) li.title = 'você mudou este limite — a sugestão é '+reais(sug.limits[x.cat]||0);
-    li.onchange = ()=>{ const v = parseFloat(li.value); if(isNaN(v)) delete BUDGET.limits[x.cat]; else BUDGET.limits[x.cat] = Math.max(0,v); saveBudget(); renderBudget(); };
+    li.onchange = ()=>{ const v = parseFloat(li.value); setLimit(x.cat, isNaN(v) ? null : Math.max(0,v)); renderBudget(); };
     mbx.appendChild(li);
     const [lbl, cls] = STATUS[x.st];
     right.append(mbx, el('span','bpill '+cls, lbl));
@@ -3074,7 +3096,8 @@ function buildWorkbook(){
   if(curMonth && curMonth!=='ALL'){
     const sug = suggestedLimits(curMonth);
     const gasto = new Map(spendCats(txOfMonth(curMonth)).map(c=>[c.cat,c.total]));
-    const lim = Object.assign({}, sug.limits, (BUDGET && BUDGET.limits) || {});
+    const lim = Object.assign({}, sug.limits);
+    Object.entries((BUDGET && BUDGET.limits) || {}).forEach(([c,v])=>{ if(v != null) lim[c] = v; });
     const linhas = Object.keys(lim).sort().map(c=>({Categoria:c, Limite:Number(lim[c].toFixed(2)),
       Sugestão:Number((sug.limits[c]||0).toFixed(2)), Gasto:Number((gasto.get(c)||0).toFixed(2)),
       Sobra:Number((lim[c]-(gasto.get(c)||0)).toFixed(2))}));
@@ -3131,7 +3154,7 @@ function mergeBackup(b){
   if(Array.isArray(b.files)) b.files.forEach(x=>{ if(!FILES.some(y=>y.name===x.name)) FILES.push(x); });
   if(Array.isArray(b.dismiss)) b.dismiss.forEach(x=>{ if(!DISMISSED.includes(x)) DISMISSED.push(x); });
   if(b.fixed) FIXED = Object.assign(FIXED||{}, b.fixed);
-  if(b.budget && !BUDGET){ BUDGET = b.budget; LS.set(K.budget, BUDGET); }
+  if(b.budget){ BUDGET = mergeBudget(BUDGET, b.budget); LS.set(K.budget, BUDGET); }
   if(b.avg && !avgMonths){ avgMonths = new Set(b.avg); LS.set(K.avg, b.avg); }
   LS.set(K.fixed, FIXED);
   TX.sort((a,b2)=> a.date<b2.date?1:a.date>b2.date?-1:0);
@@ -3207,7 +3230,7 @@ $('#addGasto').onclick = openGasto;
 $('#gForm').onsubmit = saveGasto;
 $('#gClose').onclick = ()=> $('#gastoDlg').close();
 $('#aClose').onclick = ()=> $('#atalhoDlg').close();
-$('#bReset').onclick = ()=>{ if(BUDGET){ BUDGET.limits = {}; saveBudget(); } renderBudget(); };
+$('#bReset').onclick = ()=>{ ensureBudget(); Object.keys(BUDGET.limits).forEach(c=>{ BUDGET.limits[c] = null; BUDGET.at[c] = nowIso(); }); saveBudget(); renderBudget(); };
 
 /* ============================ páginas ============================
    Cinco páginas, como abas de app. A página fica no endereço (#orcamento…) para o
@@ -3524,7 +3547,9 @@ async function cloudFetch(){
 }
 const lastSyncAt = () => { try{ return localStorage.getItem(CLOUD_AT)||''; }catch(e){ return ''; } };
 async function cloudPush(){
-  if(!supa || !cloudUser || syncing) return;
+  if(!supa || !cloudUser) return;
+  // já tem um envio ou leitura em andamento: tenta de novo em seguida, em vez de perder a mudança
+  if(syncing){ clearTimeout(pushTimer); pushTimer = setTimeout(cloudPush, 1500); return; }
   syncing = true; setCloud('saving');
   try{
     // outro aparelho salvou depois da última vez que puxamos? junta antes de sobrescrever
