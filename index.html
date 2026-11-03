@@ -1148,6 +1148,8 @@ const RULES = [
 ];
 
 const INCOME_RULES = [
+  // saldo do Flash transferido para o banco: já contou como benefício quando caiu no Flash
+  [/FLASH TECNOLOGIA/, 'Transferência','Entre contas próprias'],
   [/WISE|GLOBAL PROTE|HOSPEDARIA|PAGAMENTO DE SALARIO|SALARIO|PRO ?LABORE|63\.939\.028|REMUNERACAO|NUBANK PAGAMENTOS/, 'Receita','Trabalho'],
   [/GALDINO DA SILVA|GALDINO/, 'Receita','Família'],
   [/DEVOL|ESTORNO|\bEST\b|REEMBOLSO|CASHBACK/, 'Receita','Estorno']
@@ -1297,6 +1299,12 @@ function autoCategory(raw, isIncome, source){
   if(/^(PIX ENVIADO PARA|TRANSF)/.test(s) && isSelf(s)) return ['Transferência','Entre contas próprias'];
   if(source==='flash'){
     if(isIncome) return ['Receita','Benefício'];
+    // TED do Flash para o banco: o dinheiro só muda de conta
+    if(/TRANSFERENCIA BANCARIA|TED/.test(s)) return ['Transferência','Entre contas próprias'];
+    // o saldo "Flexível" do Flash também paga Uber, 99, bilhete, loja: essas regras valem;
+    // bar, lanchonete e afins pagos com o vale continuam sendo comida
+    const NAO_COMIDA = ['Transporte','Viagem','Compras','Roupas e cuidados','Saúde','Educação'];
+    for(const [re,c,sub] of RULES) if(re.test(s) && NAO_COMIDA.includes(c)) return [c,sub];
     for(const [re,c,sub] of RULES) if(re.test(s) && c==='Comida') return [c,sub];
     return ['Comida', flashSub(s)];
   }
@@ -1633,6 +1641,23 @@ function migrateCategories(){
   save();
 }
 
+/* O Flash era tratado como "só comida" — mas o saldo Flexível paga Uber, 99 e bilhete,
+   e a TED do Flash para o banco contava como gasto (e depois como receita no C6).
+   Repassa pelas regras os lançamentos automáticos do Flash e as TEDs vindas da Flash. */
+const FLASH_V = 1;
+function migrateFlash(){
+  if(DEMO || (LS.get('c6.flashv', 0)||0) >= FLASH_V) return;
+  let mud = 0;
+  for(const t of TX){
+    const deFlash = t.source==='flash' || /FLASH TECNOLOGIA/.test(norm((t.raw||'')+' '+(t.detail||'')));
+    if(!deFlash || t.source==='manual' || t.cat==='Transferência') continue;
+    const [c,sb] = autoCategory((t.raw||'')+' '+(t.detail||''), t.amount<0, t.source);
+    if(c!==t.cat || sb!==t.sub){ t.cat = c; t.sub = sb; mud++; }
+  }
+  try{ localStorage.setItem('c6.flashv', String(FLASH_V)); }catch(e){}
+  if(mud) save();
+}
+
 function save(){ if(DEMO) return; LS.set(K.tx,TX); LS.set(K.rules,RULES_USER); LS.set(K.over,OVERRIDE); LS.set(K.cats,CATS); LS.set(K.files,FILES); LS.set(K.dismiss,DISMISSED); LS.set(K.deleted, Array.from(DELETED)); }
 
 /* ============================ import ============================ */
@@ -1846,6 +1871,7 @@ function render(){
   $('#demoBanner').classList.toggle('hidden', !DEMO);
   migrateMerchants();
   migrateCategories();
+  migrateFlash();
   seedFixed();
   const cov = cardCoverage();
   // abre no mês mais recente que já tem fatura fechada — senão a tela parece vazia
@@ -3551,6 +3577,8 @@ function reconcileProvisional(){
       if(Math.sign(o.amount) !== Math.sign(p.amount) || rank(o) <= rank(p) || gone.has(o.id)) continue;
       // print é da fatura do cartão: só casa com a fatura, e parcela 2/2 não é a 1/2 do mês passado
       if(p.source==='print' && (o.source!=='fatura' || parcOf(p) !== parcOf(o))) continue;
+      // receita prevista à mão é dinheiro esperado no banco — crédito no vale (Flash) não é ela
+      if(p.amount < 0 && o.source==='flash') continue;
       if(used.has(o.id) || Math.abs(o.amount-p.amount) > 0.01) continue;
       const dd = Math.abs(dayNum(o.date)-dayNum(p.date));
       if(dd > 4) continue;
