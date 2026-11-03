@@ -585,6 +585,20 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 .btotal{border-top:2px solid var(--line-strong);margin-top:6px}
 .btotal .bn{font-size:16px}
 
+/* fatura do cartão */
+.fatpanel{margin-bottom:22px}
+.fatpanel .invsum{margin-bottom:16px}
+.fatform{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin:-4px 0 16px}
+.fatfield{display:flex;flex-direction:column;gap:4px}
+.fatfield input{width:80px;min-height:40px}
+.fatconta{background:var(--surface-2);border-radius:14px;padding:14px 16px}
+.fatlin{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.fatlin .fv{font-family:var(--f-mono);font-weight:500;white-space:nowrap}
+.fatlin.tot{border-bottom:0;font-weight:700;font-size:15px;padding-top:10px}
+.fatlin.tot.pos .fv{color:var(--pos)}
+.fatlin.tot.neg .fv{color:var(--crit)}
+.fatconta .fnote{margin:8px 0 0}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -652,6 +666,8 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 
     <div class="page" data-page="inicio">
       <section class="herorow" id="tiles"></section>
+
+      <section class="panel big fatpanel" id="faturaCard"></section>
 
     <section class="duo">
       <div class="panel big donutpanel">
@@ -1115,7 +1131,7 @@ const LS = {
   set(k, v){ try{ const s = JSON.stringify(v); if(localStorage.getItem(k) === s) return; localStorage.setItem(k, s); }catch(e){} cloudDirty(k); },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} cloudDirty(k); }
 };
-const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2', budget:'c6.budget.v1', deleted:'c6.deleted.v1' };
+const K = { tx:'c6.tx.v2', rules:'c6.rules.v2', over:'c6.over.v2', cats:'c6.cats.v2', files:'c6.files.v2', dismiss:'c6.dismiss.v2', avg:'c6.avg.v2', fixed:'c6.fixed.v2', fixedSeed:'c6.fixedseed.v2', plan:'c6.plan.v2', budget:'c6.budget.v1', deleted:'c6.deleted.v1', cartao:'c6.cartao.v1' };
 
 const deaccent = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const norm = s => deaccent(String(s||'')).toUpperCase().replace(/\s+/g,' ').trim();
@@ -1403,6 +1419,9 @@ let DISMISSED = LS.get(K.dismiss, []);
 let DELETED = new Set(LS.get(K.deleted, []));
 function forgetTx(ids){ ids.forEach(id=>DELETED.add(id)); TX = TX.filter(t=>!DELETED.has(t.id)); }
 let FIXED = LS.get(K.fixed, null);        // merchant -> {cutoff}: contas fixas mensais
+// dias da fatura do cartão (o C6 dele fecha ~22 e vence dia 1); `at` decide quem vence ao sincronizar
+const CARTAO_PADRAO = {fecha:22, vence:1, at:''};
+let CARTAO = LS.get(K.cartao, null) || Object.assign({}, CARTAO_PADRAO);
 let BUDGET = LS.get(K.budget, null);      // {limits:{categoria:valor}, meta}: orçamento do mês
 
 // aluguel, condomínio, luz e o crédito do vale-refeição caem perto da virada
@@ -1834,6 +1853,7 @@ function render(){
   const prev = prevM ? totals(txOfMonth(prevM)) : null;
 
   renderTiles(t, prev, prevM, list);
+  renderFatura();
   renderCats(list, t, prevM);
   renderMonthly(ms);
   renderInvest(ms);
@@ -2341,6 +2361,107 @@ function mergeBudget(a, b){
   return out;
 }
 const ymOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+/* ---- fatura do cartão: a visão de caixa ----
+   O app conta pela data da compra (competência). Este cartão responde a outra pergunta:
+   quanto vai sair da conta quando a fatura vencer, e se o que entrou no mês cobre. */
+const dmy = d => String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');
+const endOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+function closingOn(y, m){ const n = new Date(y, m+1, 0).getDate(); return new Date(y, m, Math.min(CARTAO.fecha, n)); }  // m começa em 0, pode passar de 11
+function dueAfter(close){
+  // vencimento = o primeiro "dia de vencimento" depois do fechamento
+  for(let k=0; k<3; k++){
+    const n = new Date(close.getFullYear(), close.getMonth()+k+1, 0).getDate();
+    const d = new Date(close.getFullYear(), close.getMonth()+k, Math.min(CARTAO.vence, n));
+    if(d > close) return d;
+  }
+}
+const parcN = t => { const m = /^(\d+)\s*\/\s*(\d+)$/.exec(String(t.parcela||'').trim()); return m ? +m[1] : 0; };
+function invoiceFor(close){
+  const prev = closingOn(close.getFullYear(), close.getMonth()-1);
+  const from = new Date(prev.getFullYear(), prev.getMonth(), prev.getDate()+1);
+  const due = dueAfter(close), dueYm = ymOf(due);
+  const items = TX.filter(t=>{
+    if(t.method !== 'Crédito' || /FLASH|BENEF/i.test(t.card||'')) return false;   // cartão de benefício não entra na fatura
+    if(parcN(t) > 1){
+      // parcela antiga: fica na fatura que vence no mês seguinte ao mês de competência dela
+      const [yy,mm] = (t.month||t.date.slice(0,7)).split('-').map(Number);
+      return ymOf(new Date(yy, mm, 1)) === dueYm;
+    }
+    const d = new Date(t.date+'T12:00:00');
+    return d >= from && d <= endOfDay(close);
+  });
+  return {from, close, due, items, total: items.reduce((a,t)=>a+t.amount,0), prov: items.filter(t=>t.prov).length};
+}
+
+function renderFatura(){
+  const box = $('#faturaCard'); if(!box) return;
+  box.innerHTML = '';
+  if(!TX.some(t=>t.method==='Crédito')){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const today = new Date();
+  let close = closingOn(today.getFullYear(), today.getMonth());
+  let fechada = null;                 // fatura que já fechou e ainda não venceu
+  if(today > endOfDay(close)){
+    const inv = invoiceFor(close);
+    if(today <= endOfDay(inv.due)) fechada = inv;
+    close = closingOn(today.getFullYear(), today.getMonth()+1);
+  }
+  const aberta = invoiceFor(close);
+  // gasto típico por dia no cartão: mediana das 6 faturas anteriores que têm lançamentos
+  const dias = inv => Math.round((inv.close - inv.from)/864e5) + 1;
+  const passadas = [1,2,3,4,5,6].map(k=> invoiceFor(closingOn(close.getFullYear(), close.getMonth()-k))).filter(p=>p.items.length >= 5);
+  const porDia = median(passadas.map(p=> p.items.filter(t=>parcN(t)<=1).reduce((a,t)=>a+t.amount,0) / dias(p)));
+  const faltam = Math.max(0, Math.ceil((endOfDay(close) - today)/864e5));
+  const previsao = aberta.total + porDia*faltam;
+
+  // cabeçalho
+  const head = el('div','phead');
+  const ht = el('div'); ht.append(el('h2', null, 'Fatura do cartão'), el('span','note', 'quanto vai sair da conta quando a fatura vencer'));
+  const aj = el('button','btn ghost tiny','ajustar datas'); aj.type = 'button';
+  head.append(ht, aj);
+  box.appendChild(head);
+
+  // ajuste dos dias (fecha / vence)
+  const form = el('form','fatform hidden');
+  const campo = (rot, val) => { const l = el('label','fatfield'); l.appendChild(el('span','eyebrow', rot)); const i = document.createElement('input'); i.type='number'; i.min='1'; i.max='31'; i.value = val; l.appendChild(i); form.appendChild(l); return i; };
+  const iF = campo('fecha dia', CARTAO.fecha), iV = campo('vence dia', CARTAO.vence);
+  const ok = el('button','btn tiny','salvar'); ok.type = 'submit'; form.appendChild(ok);
+  form.appendChild(el('span','fnote','olhe no app do banco: "melhor dia de compra" é o dia seguinte ao fechamento'));
+  form.onsubmit = e => { e.preventDefault(); const f = parseInt(iF.value,10), v = parseInt(iV.value,10);
+    if(f>=1 && f<=31 && v>=1 && v<=31){ CARTAO = {fecha:f, vence:v, at:new Date().toISOString()}; if(!DEMO) LS.set(K.cartao, CARTAO); render(); } };
+  aj.onclick = ()=> form.classList.toggle('hidden');
+  box.appendChild(form);
+
+  // números da fatura
+  const g = el('div','invsum');
+  const tile = (rot, v, d, cor) => { const c = el('div','invtile'); const vv = el('div','v', brl(v)); if(cor) vv.style.color = cor; c.append(el('div','eyebrow', rot), vv); if(d) c.appendChild(el('div','d', d)); g.appendChild(c); };
+  if(fechada) tile('fechada · vence '+dmy(fechada.due), fechada.total, 'compras de '+dmy(fechada.from)+' a '+dmy(fechada.close), 'var(--crit)');
+  tile('aberta · vence '+dmy(aberta.due), aberta.total, 'compras de '+dmy(aberta.from)+' a '+dmy(aberta.close)+' · '+aberta.items.length+' lançamentos'+(aberta.prov ? ' ('+aberta.prov+' provisórios)' : ''));
+  tile('previsão no fechamento ('+dmy(aberta.close)+')', previsao, faltam ? 'faltam '+faltam+' dias · uns '+reais(porDia)+' por dia no cartão' : 'fecha hoje');
+  box.appendChild(g);
+
+  // caixa do mês: o que entrou, menos o que saiu por fora do cartão, menos a fatura que este dinheiro vai pagar
+  const ym = ymOf(today);
+  const doMes = txOfMonth(ym);
+  const entrou = doMes.filter(t=>effective(t).cat==='Receita' && !/^Flash/.test(t.method||'')).reduce((a,t)=>a-t.amount,0);
+  const aReceber = doMes.filter(t=>effective(t).cat==='Receita' && t.prov).reduce((a,t)=>a-t.amount,0);
+  const fora = doMes.filter(t=>isExpense(t) && t.amount>0 && t.method!=='Crédito' && !/^Flash/.test(t.method||'')).reduce((a,t)=>a+t.amount,0);
+  const investido = doMes.filter(t=>effective(t).cat==='Investimento').reduce((a,t)=>a+t.amount,0);
+  const paga = fechada || aberta;
+  const valorFat = fechada ? fechada.total : previsao;
+  const sobra = entrou - fora - Math.max(0, investido) - valorFat;
+  const conta = el('div','fatconta');
+  conta.appendChild(el('div','eyebrow','caixa de '+monthName(ym)+' (estimativa)'));
+  const linha = (rot, v, cls) => { const r = el('div','fatlin'+(cls?' '+cls:'')); r.append(el('span', null, rot), el('span','fv', (v<0?'− ':'')+brl(Math.abs(v)))); conta.appendChild(r); };
+  linha('Entrou'+(aReceber ? ' (inclui '+reais(aReceber)+' a receber)' : ''), entrou);
+  linha('Pago fora do cartão (Pix, débito, conta)', -fora);
+  if(investido > 0.5) linha('Foi para investimentos', -investido);
+  linha((fechada ? 'Fatura fechada' : 'Fatura aberta (previsão)')+' · vence '+dmy(paga.due), -valorFat);
+  linha(sobra >= 0 ? 'Deve sobrar depois de pagar' : 'Falta para pagar tudo', sobra, sobra >= 0 ? 'tot pos' : 'tot neg');
+  conta.appendChild(el('p','fnote','Conta que o dinheiro que entra no mês paga a fatura que vence logo depois (a sua vence dia '+CARTAO.vence+'). Compras no cartão não entram em "pago fora do cartão" — elas estão na fatura.'));
+  box.appendChild(conta);
+}
+
 function median(xs){
   const s = xs.slice().sort((a,b)=>a-b), n = s.length;
   if(!n) return 0;
@@ -3127,7 +3248,7 @@ $('#expJson').onclick = ()=>{
   const hoje = new Date().toISOString().slice(0,10);
   saveFile('backup-onde-foi-o-dinheiro-'+hoje+'.json', JSON.stringify({
     v:2, exportado:new Date().toISOString(),
-    tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED, budget:BUDGET, deleted:Array.from(DELETED)
+    tx:TX, rules:RULES_USER, over:OVERRIDE, cats:CATS, files:FILES, dismiss:DISMISSED, fixed:FIXED, budget:BUDGET, deleted:Array.from(DELETED), cartao:CARTAO
   }));
 };
 /* junta um backup (ou o que está na nuvem) com o que já está aqui; devolve quantos lançamentos são novos */
@@ -3155,6 +3276,7 @@ function mergeBackup(b){
   if(Array.isArray(b.dismiss)) b.dismiss.forEach(x=>{ if(!DISMISSED.includes(x)) DISMISSED.push(x); });
   if(b.fixed) FIXED = Object.assign(FIXED||{}, b.fixed);
   if(b.budget){ BUDGET = mergeBudget(BUDGET, b.budget); LS.set(K.budget, BUDGET); }
+  if(b.cartao && (b.cartao.at||'') > (CARTAO.at||'')){ CARTAO = b.cartao; LS.set(K.cartao, CARTAO); }
   if(b.avg && !avgMonths){ avgMonths = new Set(b.avg); LS.set(K.avg, b.avg); }
   LS.set(K.fixed, FIXED);
   TX.sort((a,b2)=> a.date<b2.date?1:a.date>b2.date?-1:0);
@@ -3502,7 +3624,7 @@ async function openAtalho(){
    tabela (veja supabase.sql). Vazios, o app continua só local, como antes. */
 var SUPA_URL = 'https://wicijaskeaiplfucifta.supabase.co';
 var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpY2lqYXNrZWFpcGxmdWNpZnRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDE4NzgsImV4cCI6MjEwNzIxNzg3OH0.RDu947wTaCqh8dGApLy1m3C3tH8j3lme4GGiYY8lD8M';
-var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','budget','deleted'];
+var SYNC_KEYS = ['tx','rules','over','cats','files','dismiss','fixed','fixedSeed','avg','budget','deleted','cartao'];
 var CLOUD_DIRTY = 'c6.cloud.dirty', CLOUD_AT = 'c6.cloud.at';
 var supa = null, cloudUser = null, cloudState = 'off', cloudMsg = '', pushTimer = null, applying = false, syncing = false;
 
@@ -3526,7 +3648,7 @@ function applyState(s){
   DEMO = false;
   TX = LS.get(K.tx, []); RULES_USER = LS.get(K.rules, {}); OVERRIDE = LS.get(K.over, {});
   CATS = LS.get(K.cats, DEFAULT_CATS); FILES = LS.get(K.files, []); DISMISSED = LS.get(K.dismiss, []); DELETED = new Set(LS.get(K.deleted, []));
-  FIXED = LS.get(K.fixed, null); BUDGET = LS.get(K.budget, null);
+  FIXED = LS.get(K.fixed, null); BUDGET = LS.get(K.budget, null); CARTAO = LS.get(K.cartao, null) || Object.assign({}, CARTAO_PADRAO);
   const av = LS.get(K.avg, null); avgMonths = av ? new Set(av) : null;
   renderFiles(); render();
 }
