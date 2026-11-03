@@ -619,6 +619,9 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 .cdtop{gap:10px}
 .dlg{overflow-x:hidden}
 #catDlg .mnames span{overflow:hidden;text-overflow:clip;white-space:nowrap}
+#catDlg .mstack{opacity:.72}
+#catDlg .mcol:hover .mstack{opacity:.9}
+#catDlg .mcol.cur .mstack{opacity:1}
 @media(max-width:760px){.cdchart{height:200px;gap:4px}.cdchart .lbl{font-size:9.5px}#catDlg .mnames{gap:4px}#catDlg .mnames span{font-size:11px}.dlg.wide{padding:16px}}
 
 /* sincronização */
@@ -3249,7 +3252,8 @@ function openPop(ev, t){
 
 /* ============================ tooltip ============================ */
 const tt = $('#tt');
-function showTT(e, text){ tt.textContent=text; tt.style.opacity='1'; tt.style.left=(e.clientX+12)+'px'; tt.style.top=(e.clientY-28)+'px'; }
+// janela aberta com showModal fica numa camada acima de tudo — a dica precisa estar dentro dela
+function showTT(e, text){ const host = document.querySelector('dialog[open]') || document.body; if(tt.parentNode !== host) host.appendChild(tt); tt.textContent=text; tt.style.opacity='1'; tt.style.left=(e.clientX+12)+'px'; tt.style.top=(e.clientY-28)+'px'; }
 function hideTT(){ tt.style.opacity='0'; }
 
 /* ============================ export ============================ */
