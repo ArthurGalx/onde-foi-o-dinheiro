@@ -3630,7 +3630,10 @@ function renderSync(){
   }
   const pill = el('button','syncpill '+cloudState);
   pill.type = 'button';
-  const txt = cloudState==='saving' ? 'Salvando…' : cloudState==='pulling' ? 'Atualizando…' : cloudState==='err' ? (cloudMsg||'erro')+' — tentar de novo' : 'Sincronizado';
+  // a hora da última sincronização deixa conferir se celular e computador estão em dia
+  let quando = '';
+  try{ const at = localStorage.getItem(CLOUD_AT); if(at){ const d = new Date(at); quando = ' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); } }catch(e){}
+  const txt = cloudState==='saving' ? 'Salvando…' : cloudState==='pulling' ? 'Atualizando…' : cloudState==='err' ? (cloudMsg||'erro')+' — tentar de novo' : isCloudDirty() ? 'Falta enviar · toque para enviar' : 'Sincronizado'+quando;
   pill.innerHTML = CLOUD_ICON;
   pill.appendChild(el('span', null, txt));
   pill.title = cloudUser.email || '';
@@ -3660,7 +3663,22 @@ async function cloudInit(){
   });
   renderSync();
   // voltou para a aba: pode ter mudado no outro aparelho
-  document.addEventListener('visibilitychange', async ()=>{ if(document.visibilityState!=='visible' || !cloudUser) return; if(!isCloudDirty()) await cloudPull(); pullInbox(); });
+  /* Conferir a nuvem só ao voltar para a aba deixava o computador desatualizado: com a
+     página aberta e visível, ele nunca via o que o celular mudou. Agora confere também a
+     cada 30 s, ao voltar para a janela e quando a internet volta — é só a data (poucos
+     bytes); o resto só desce se mudou. E o que não subiu (ex.: sem internet) é reenviado. */
+  let lastTick = 0;
+  const syncTick = async (force)=>{
+    if(!cloudUser || syncing || document.visibilityState!=='visible') return;
+    if(!force && Date.now() - lastTick < 5000) return;
+    lastTick = Date.now();
+    if(isCloudDirty()) await cloudPush(); else await cloudPull();
+    pullInbox();
+  };
+  document.addEventListener('visibilitychange', ()=> syncTick(true));
+  window.addEventListener('focus', ()=> syncTick());
+  window.addEventListener('online', ()=> syncTick(true));
+  setInterval(()=> syncTick(true), 30000);
 }
 
 renderFiles();
