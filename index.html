@@ -599,6 +599,28 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
 .fatlin.tot.neg .fv{color:var(--crit)}
 .fatconta .fnote{margin:8px 0 0}
 
+/* detalhe da categoria */
+.ccard.clickable{cursor:pointer;transition:border-color .15s}
+.ccard.clickable:hover{border-color:var(--line-strong)}
+.cmore{border:0;background:transparent;color:var(--ink-2);font-size:13px;font-weight:600;text-align:left;padding:4px 0;margin-top:-4px;align-self:flex-start}
+.cmore:hover{color:var(--ink)}
+.dlg.wide{width:min(860px,calc(100vw - 24px))}
+#cdTitle{display:flex;align-items:center;gap:10px}
+#cdTitle .ico{width:34px;height:34px;border-radius:10px}
+.cdchart{height:220px;margin-top:22px}
+.cdkey{font-size:12px;color:var(--ink-3);margin-top:8px}
+.cdh{margin:20px 0 10px}
+.cdsubs{display:flex;flex-direction:column;gap:8px}
+.cdsub{display:flex;align-items:center;gap:10px;font-size:14px}
+.cdsub i{width:12px;height:12px;border-radius:4px;flex:none}
+.cdsub .sn{flex:1;min-width:0}
+.cdsub .sp{font:500 12.5px var(--f-mono);color:var(--ink-3);width:44px;text-align:right}
+.cdsub .sv{font:600 13px var(--f-mono);width:112px;text-align:right}
+.cdtop{gap:10px}
+.dlg{overflow-x:hidden}
+#catDlg .mnames span{overflow:hidden;text-overflow:clip;white-space:nowrap}
+@media(max-width:760px){.cdchart{height:200px;gap:4px}.cdchart .lbl{font-size:9.5px}#catDlg .mnames{gap:4px}#catDlg .mnames span{font-size:11px}.dlg.wide{padding:16px}}
+
 /* sincronização */
 .topside{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
 .sync{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
@@ -870,6 +892,10 @@ tr:hover td.desc .fixdel,td.desc .fixdel:focus-visible,td.desc .fixdel.armed{opa
     <p class="fnote" id="gNota">Entra como <b>provisório</b>: conta no orçamento agora e é trocado pelo lançamento da fatura quando você importar.</p>
     <div class="row" style="justify-content:flex-end"><span class="fnote" id="gMsg" style="color:var(--crit)"></span><button class="btn" type="submit">Salvar</button></div>
   </form>
+</dialog>
+<dialog class="dlg wide" id="catDlg" aria-labelledby="cdTitle">
+  <div class="dhead"><h2 id="cdTitle">Categoria</h2><button type="button" class="fixdel" id="cdClose" aria-label="Fechar">×</button></div>
+  <div id="cdBody"></div>
 </dialog>
 <dialog class="dlg" id="atalhoDlg" aria-labelledby="aTitle">
   <div class="dhead"><h2 id="aTitle">Atalho do iPhone</h2><button type="button" class="fixdel" id="aClose" aria-label="Fechar">×</button></div>
@@ -2104,6 +2130,12 @@ function renderCats(list, t, prevM){
       list2.appendChild(more);
     }
     card.appendChild(list2);
+    const det = el('button','cmore','ver mês a mês →'); det.type = 'button';
+    det.setAttribute('aria-label', c.cat+': ver mês a mês');
+    det.onclick = ev => { ev.stopPropagation(); openCatDetail(c.cat); };
+    card.appendChild(det);
+    card.classList.add('clickable');
+    card.onclick = ev => { if(ev.target.closest('button')) return; openCatDetail(c.cat); };
     box.appendChild(card);
   });
 
@@ -2122,6 +2154,100 @@ function renderCats(list, t, prevM){
       other.appendChild(ch);
     });
   }
+}
+
+/* ---- detalhe de uma categoria: 12 meses empilhados pelas subcategorias ---- */
+function openCatDetail(cat){
+  const dlg = $('#catDlg'), body = $('#cdBody');
+  const meta = catMeta(cat);
+  const t = $('#cdTitle'); t.innerHTML = ''; t.append(icoEl(meta.i, meta.c, 18), document.createTextNode(' '+cat));
+  body.innerHTML = '';
+  const ms = months().slice(0,12).reverse();
+  const data = ms.map(m=>{ const c = byCategory(txOfMonth(m)).find(x=>x.cat===cat); return {m, total: c ? Math.max(0,c.total) : 0, subs: c ? c.subs : new Map(), n: c ? c.n : 0}; });
+  // subcategorias na ordem do que mais pesou no período; cada uma um tom da cor da categoria
+  const peso = new Map();
+  data.forEach(d=> d.subs.forEach((v,k)=> peso.set(k, (peso.get(k)||0) + Math.max(0,v))));
+  const subs = Array.from(peso.keys()).filter(k=>peso.get(k)>0).sort((a,b)=>peso.get(b)-peso.get(a));
+  const TONS = [[100,'white'],[62,'white'],[70,'black'],[38,'white'],[45,'black'],[22,'white']];
+  const tom = i => { const [p, mix] = TONS[i % TONS.length]; return p===100 ? meta.c : 'color-mix(in srgb, '+meta.c+' '+p+'%, '+mix+')'; };
+  const corDe = new Map(subs.map((k,i)=>[k, tom(i)]));
+  const comDado = data.filter(d=>d.total>0);
+  const media = comDado.length ? data.reduce((a,d)=>a+d.total,0) / data.length : 0;
+  const maior = data.reduce((a,d)=> d.total > a.total ? d : a, {total:0, m:''});
+  const atual = data.find(d=>d.m===curMonth);
+
+  if(!comDado.length){ body.appendChild(el('p','fnote','Nenhum gasto nesta categoria nos últimos 12 meses.')); dlg.showModal(); return; }
+
+  // números
+  const g = el('div','invsum');
+  const tile = (rot, v, d) => { const c = el('div','invtile'); c.append(el('div','eyebrow', rot), el('div','v', brl(v))); if(d) c.appendChild(el('div','d', d)); g.appendChild(c); };
+  tile('média por mês', media, data.length+' meses');
+  if(atual) tile(monthName(atual.m), atual.total, media>0 ? (atual.total>=media ? reais(atual.total-media)+' acima da média' : reais(media-atual.total)+' abaixo da média') : '');
+  tile('maior mês', maior.total, maior.m ? monthName(maior.m)+' de '+maior.m.slice(0,4) : '');
+  body.appendChild(g);
+
+  // gráfico
+  const max = Math.max(1, ...data.map(d=>d.total));
+  const H = 180;
+  // tela estreita: 12 meses não cabem com nome e valor — mês curto e valor só no escolhido e no maior
+  const estreito = window.innerWidth < 640;
+  const nomeMes = m => estreito ? MONTHS_PT[+m.split('-')[1]-1] : monthLabel(m);
+  const chart = el('div','mchart cdchart');
+  const line = el('div','avgline'); line.style.bottom = (media/max*H)+'px'; chart.appendChild(line);
+  const names = el('div','mnames');
+  data.forEach(d=>{
+    const col = el('button','mcol'+(d.m===curMonth?' cur':''));
+    col.type = 'button';
+    col.setAttribute('aria-label', monthLabel(d.m)+': '+brl(d.total));
+    const mostra = d.total && (!estreito || d.m===curMonth || d.m===maior.m);
+    col.appendChild(el('span','lbl', mostra ? reais(d.total) : ''));
+    const st = el('div','mstack'); st.style.height = Math.max(d.total?2:0, d.total/max*H)+'px';
+    subs.forEach(k=>{
+      const v = Math.max(0, d.subs.get(k)||0); if(!v) return;
+      const seg = el('div'); seg.style.height = (v/d.total*100)+'%'; seg.style.background = corDe.get(k);
+      hoverTT(seg, monthLabel(d.m)+' · '+k+' · '+brl(v));
+      st.appendChild(seg);
+    });
+    col.appendChild(st);
+    col.onclick = ()=>{ curMonth = d.m; render(); openCatDetail(cat); };
+    chart.appendChild(col);
+    names.appendChild(el('span', d.m===curMonth?'cur':null, nomeMes(d.m)));
+  });
+  body.append(chart, names);
+  body.appendChild(el('div','cdkey', 'linha tracejada = média de '+reais(media)+' por mês · toque num mês para abri-lo'));
+
+  // subcategorias no período
+  const lg = el('div','cdsubs');
+  const totP = subs.reduce((a,k)=>a+peso.get(k),0) || 1;
+  subs.forEach(k=>{
+    const r = el('div','cdsub');
+    const dot = el('i'); dot.style.background = corDe.get(k);
+    r.append(dot, el('span','sn', k), el('span','sp', pctTxt(peso.get(k)/totP*100)), el('span','sv', brl(peso.get(k)/data.length)+'/mês'));
+    lg.appendChild(r);
+  });
+  body.appendChild(el('div','eyebrow cdh','subcategorias · média por mês'));
+  body.appendChild(lg);
+
+  // onde mais gastou na categoria no período
+  const por = new Map();
+  ms.forEach(m=> txOfMonth(m).forEach(x=>{ if(effective(x).cat!==cat || x.amount<=0) return; const e = por.get(x.merchant) || {v:0,n:0}; e.v += x.amount; e.n++; por.set(x.merchant, e); }));
+  const top = Array.from(por).sort((a,b)=>b[1].v-a[1].v).slice(0,8);
+  if(top.length){
+    body.appendChild(el('div','eyebrow cdh','onde mais gastou · '+data.length+' meses'));
+    const ol = el('ol','merchlist cdtop');
+    const mx = top[0][1].v;
+    top.forEach(([mer, e], i)=>{
+      const li = el('li');
+      li.appendChild(el('span','rk', String(i+1)));
+      const b = el('div','mb');
+      const tt = el('div','mt'); tt.append(el('span','mn', pretty(mer)), el('span','mv', brl(e.v)));
+      const bar = el('div','mbar'); const tr = el('div','mtr'); const f = el('div'); f.style.width = (e.v/mx*100)+'%'; f.style.background = meta.c; tr.appendChild(f);
+      bar.append(tr, el('span','mm', e.n+' '+(e.n>1?'vezes':'vez')+' · '+reais(e.v/e.n)+' cada'));
+      b.append(tt, bar); li.appendChild(b); ol.appendChild(li);
+    });
+    body.appendChild(ol);
+  }
+  if(!dlg.open) dlg.showModal();
 }
 
 function renderMonthly(ms){
@@ -3352,6 +3478,7 @@ $('#addGasto').onclick = openGasto;
 $('#gForm').onsubmit = saveGasto;
 $('#gClose').onclick = ()=> $('#gastoDlg').close();
 $('#aClose').onclick = ()=> $('#atalhoDlg').close();
+$('#cdClose').onclick = ()=> $('#catDlg').close();
 $('#bReset').onclick = ()=>{ ensureBudget(); Object.keys(BUDGET.limits).forEach(c=>{ BUDGET.limits[c] = null; BUDGET.at[c] = nowIso(); }); saveBudget(); renderBudget(); };
 
 /* ============================ páginas ============================
