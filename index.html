@@ -3530,8 +3530,14 @@ function applyState(s){
   const av = LS.get(K.avg, null); avgMonths = av ? new Set(av) : null;
   renderFiles(); render();
 }
+/* Qual nuvem este aparelho já conhece (projeto + conta). Projeto novo — o antigo sumiu,
+   ou outra conta — não pode simplesmente substituir o que está aqui: o primeiro aparelho a
+   entrar apagaria o que só existe no segundo. Nesse caso junta e sobe. */
+const CLOUD_BASE = 'c6.cloud.base';
+const cloudBaseNow = () => SUPA_URL + '|' + (cloudUser ? cloudUser.id : '');
+const isNewCloud = () => { try{ return localStorage.getItem(CLOUD_BASE) !== cloudBaseNow(); }catch(e){ return false; } };
 function markSynced(at){
-  try{ localStorage.removeItem(CLOUD_DIRTY); localStorage.setItem(CLOUD_AT, at||''); }catch(e){}
+  try{ localStorage.removeItem(CLOUD_DIRTY); localStorage.setItem(CLOUD_AT, at||''); localStorage.setItem(CLOUD_BASE, cloudBaseNow()); }catch(e){}
 }
 
 // primeiro só a data (alguns bytes); o estado inteiro (~300 KB) só quando mudou
@@ -3577,7 +3583,8 @@ async function cloudPull(){
   try{
     // nada mudou na nuvem e nada mudou aqui: não baixa nada nem mexe no selo
     const stamp = await cloudStamp();
-    if(stamp && stamp === lastSyncAt() && !isCloudDirty()){ syncing = false; if(cloudState!=='ok') setCloud('ok'); return; }
+    const fresh = isNewCloud() && TX.length > 0 && !DEMO;
+    if(stamp && stamp === lastSyncAt() && !isCloudDirty() && !fresh){ syncing = false; if(cloudState!=='ok') setCloud('ok'); return; }
     setCloud('pulling');
     const remote = await cloudFetch();
     const lastAt = lastSyncAt();
@@ -3587,8 +3594,8 @@ async function cloudPull(){
       if(TX.length && !DEMO) await cloudPush(); else setCloud('ok');
       return;
     }
-    if(isCloudDirty()){
-      // mexeu aqui sem internet ou antes de entrar: junta as duas coisas e sobe
+    if(isCloudDirty() || fresh){
+      // mexeu aqui sem internet ou antes de entrar, ou é uma nuvem nova: junta as duas coisas e sobe
       applying = true; mergeBackup(remote.estado); applying = false;
       renderFiles(); render();
       try{ localStorage.setItem(CLOUD_AT, remote.atualizado); }catch(e){}
