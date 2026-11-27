@@ -3290,14 +3290,27 @@ function setDlState(ready){
   $('#dlNote').textContent = ready ? '' :
     'A exportação de arquivos não está disponível nesta visualização. O botão “Apagar tudo” e as regras continuam funcionando.';
 }
-setDlState(false);
-if(window.claude && typeof window.claude.use === 'function'){
+// dentro do claude.ai o download passa pela permissão "downloads"; num navegador comum
+// (GitHub Pages, celular) o arquivo é baixado direto
+const IN_CLAUDE = !!(window.claude && typeof window.claude.use === 'function');
+setDlState(!IN_CLAUDE);
+if(IN_CLAUDE){
   window.claude.use('downloads').then(d=>{ downloads = d; setDlState(!!d); }).catch(()=> setDlState(false));
 }
+function browserSave(filename, data){
+  const type = /\.json$/.test(filename) ? 'application/json'
+             : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const url = URL.createObjectURL(new Blob([data], {type}));
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 60000);
+}
 async function saveFile(filename, data){
-  if(!downloads) return;
+  if(!downloads && IN_CLAUDE) return;
   try{
-    await downloads.save({filename, data});
+    if(downloads) await downloads.save({filename, data});
+    else browserSave(filename, data);
     $('#dlNote').textContent = 'Salvo: ' + filename;
   }catch(e){
     $('#dlNote').textContent = e && e.code==='declined'
